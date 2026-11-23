@@ -179,6 +179,22 @@ export function generatePlanetWorld(seed = WORLD_SEED): PlanetWorld {
     selectedSurfaceWeight += cell.surfaceWeight;
   }
 
+  // The final whole cell can cross the target. Keep whichever side is closer
+  // to 73% so the finite grid has the smallest possible area-weight error.
+  const lastLandIndex = landIndices[landIndices.length - 1];
+  const lastLandCell = ranked.find((cell) => cell.index === lastLandIndex);
+  if (lastLandCell) {
+    const withLastError = Math.abs(selectedSurfaceWeight - targetSurfaceWeight);
+    const withoutLastError = Math.abs(
+      selectedSurfaceWeight - lastLandCell.surfaceWeight - targetSurfaceWeight
+    );
+    if (withoutLastError < withLastError) {
+      rawLand[lastLandIndex] = 0;
+      landIndices.pop();
+      selectedSurfaceWeight -= lastLandCell.surfaceWeight;
+    }
+  }
+
   const countrySeeds = selectCountrySeeds(landIndices, rand);
   const cells: WorldCell[] = new Array(ranked.length);
   const countryLandCounts = new Array(COUNTRY_COUNT).fill(0) as number[];
