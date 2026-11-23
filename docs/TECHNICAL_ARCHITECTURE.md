@@ -38,7 +38,7 @@ Only modules required by the current milestone need to exist in code. Future mod
 
 ## 4. Rendering strategy
 
-Use an observer camera that orbits around Earth's centre with drag and uses fixed-axis distance zoom (do not rotate the planet in response to pointer dragging or couple pinch gestures to camera orbit). The current atlas geography grid is 540 × 270 and includes:
+Use an observer camera that can orbit continuously through a full 360° around Earth's centre, including over both poles, with drag and fixed-axis distance zoom (do not rotate the planet in response to pointer dragging or couple pinch gestures to camera orbit). The current atlas geography grid is 540 × 270 and includes:
 - Per-cell elevation, moisture, temperature and biome classification.
 - Procedural mountain/highland/plain relief and coastal terrain.
 - Deterministic drainage paths that mark river cells.
@@ -95,5 +95,5 @@ Persist versioned world snapshots and event/checkpoint data. A save should inclu
 
 Every milestone follows: define → design → build → test → integrate → simulate → optimize → freeze.
 
-- Globe interaction uses Pointer Events with a single-finger/mouse camera-orbit path and a separate two-pointer pinch-zoom path; multi-touch cannot accidentally orbit the camera. Dragging changes only the observer's azimuth/elevation around Earth. The planet is never manually rotated by pointer input.
-- The scene uses a hierarchical solar system: the Sun is at the system origin, Earth revolves around it once per 365 simulated days, and the Moon revolves around Earth once per 30 simulated days. Earth rotates once per 1,440 simulation minutes / 24 real minutes. The camera follows Earth's centre while orbiting around it, so the Sun and Moon change apparent screen position naturally as the observer moves. The Sun, Moon and star field are not attached to the camera or manually dragged. Directional sunlight aims from the Sun toward Earth's current world position, and moonlight follows the Moon's current position.
+- Globe interaction uses Pointer Events with a single-finger/mouse camera-orbit path and a separate two-pointer pinch-zoom path; multi-touch cannot accidentally orbit the camera. Dragging changes only the observer's azimuth/elevation around Earth. Both angles remain continuous so the camera can complete a full 360° vertical orbit as well as unlimited horizontal revolutions. The planet is never manually rotated by pointer input.
+- The scene uses a hierarchical solar system: the Sun is at the system origin, Earth revolves around it once per 365 simulated days, and the Moon revolves around Earth once per 30 simulated days. Earth rotates once per 1,440 simulation minutes / 24 real minutes. The camera follows Earth's centre while orbiting around it, so the Sun and Moon change apparent screen position naturally as the observer moves. The visual orbital spacing is intentionally enlarged for readability: Earth orbits at a 4.4-unit radius and the Moon at 2.7 units from Earth. The Sun, Moon and star field are not attached to the camera or manually dragged. Directional sunlight aims from the Sun toward Earth's current world position, and moonlight follows the Moon's current position.
