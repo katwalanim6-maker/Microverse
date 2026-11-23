@@ -38,14 +38,15 @@ Only modules required by the current milestone need to exist in code. Future mod
 
 ## 4. Rendering strategy
 
-Use a globe-first camera with explicit drag rotation and fixed-axis zoom (do not couple pinch gestures to rotation). The current atlas geography grid is 540 × 270 and includes:
+Use an observer camera that orbits around Earth's centre with drag and uses fixed-axis distance zoom (do not rotate the planet in response to pointer dragging or couple pinch gestures to camera orbit). The current atlas geography grid is 540 × 270 and includes:
 - Per-cell elevation, moisture, temperature and biome classification.
 - Procedural mountain/highland/plain relief and coastal terrain.
 - Deterministic drainage paths that mark river cells.
 - Country-aware natural terrain colouring and visible political boundaries.
 - A high-resolution displaced 3D mesh whose vertex radius follows smoothly interpolated elevation and land/ocean height fields.
 - Separate smooth Catmull–Rom country-border curves projected onto the terrain surface; borders are geometry, not darkened map pixels.
-- A fixed-axis zoom camera; pinch zoom is isolated from drag rotation so zoom gestures cannot spin the planet.
+- An observer camera that orbits around Earth's centre when dragged; the planet's surface, Sun, Moon and distant stars are never rotated by pointer input.
+- Pinch/wheel zoom changes only observer distance; it does not move celestial bodies or alter orbital mechanics.
 
 Zoom tiers:
 - Planet: globe, continents, oceans and broad borders.
@@ -94,5 +95,5 @@ Persist versioned world snapshots and event/checkpoint data. A save should inclu
 
 Every milestone follows: define → design → build → test → integrate → simulate → optimize → freeze.
 
-- Globe interaction uses Pointer Events with a single-finger/mouse rotation path and a separate two-pointer pinch-zoom path; multi-touch cannot accidentally rotate the globe. Rotation sensitivity is reduced overall and scales down further at close zoom, while both axes remain unrestricted.
-- The scene uses a hierarchical solar system: the Sun is at the system origin, Earth revolves around it once per 365 simulated days, and the Moon revolves around Earth once per 30 simulated days. Earth rotates once per 1,440 simulation minutes / 24 real minutes. The camera follows Earth's centre so the globe remains the interaction focus while the Sun and Moon move naturally across the observer's sky. Manual globe rotation affects only the globe; it cannot drag the orbital bodies or star field. Directional sunlight aims from the Sun toward Earth's current world position, and moonlight follows the Moon's current position.
+- Globe interaction uses Pointer Events with a single-finger/mouse camera-orbit path and a separate two-pointer pinch-zoom path; multi-touch cannot accidentally orbit the camera. Dragging changes only the observer's azimuth/elevation around Earth. The planet is never manually rotated by pointer input.
+- The scene uses a hierarchical solar system: the Sun is at the system origin, Earth revolves around it once per 365 simulated days, and the Moon revolves around Earth once per 30 simulated days. Earth rotates once per 1,440 simulation minutes / 24 real minutes. The camera follows Earth's centre while orbiting around it, so the Sun and Moon change apparent screen position naturally as the observer moves. The Sun, Moon and star field are not attached to the camera or manually dragged. Directional sunlight aims from the Sun toward Earth's current world position, and moonlight follows the Moon's current position.
