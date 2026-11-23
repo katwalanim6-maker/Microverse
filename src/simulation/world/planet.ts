@@ -341,11 +341,15 @@ export function generatePlanetWorld(seed = WORLD_SEED): PlanetWorld {
   for (const cell of cells) {
     if (cell.countryIndex < 0) continue;
     const stats = geography[cell.countryIndex];
-    if (cell.terrain === 'coast') stats.coastlineCells++;
-    else stats.terrain[cell.terrain]++;
+    if (cell.terrain === 'coast') {
+      stats.coastlineCells++;
+      stats.biomes.coast++;
+    } else if (cell.terrain !== 'ocean') {
+      stats.terrain[cell.terrain]++;
+      if (cell.biome !== 'ocean') stats.biomes[cell.biome]++;
+    }
     if (cell.river) stats.riverCells++;
     stats.highestElevation = Math.max(stats.highestElevation, cell.elevation);
-    stats.biomes[cell.terrain === 'coast' ? 'coast' : cell.biome]++;
   }
 
   const countries: Country[] = COUNTRY_NAMES.map((name, index) => ({
