@@ -80,3 +80,62 @@ footer { display: flex; justify-content: space-between; padding: 20px 0 26px; bo
 
 .world-summary { width: fit-content; max-width: 100%; margin: 0 auto 18px; padding: 9px 14px; border: 1px solid rgba(165,148,255,.18); border-radius: 999px; background: rgba(27,24,48,.48); color: #c4bcf5; text-align: center; font: 9px 'DM Mono', monospace; letter-spacing: .08em; }
 @media (max-width: 560px) { .world-summary { font-size: 8px; letter-spacing: .035em; padding: 9px 10px; } }
+
+
+/* Expanded atlas layout */
+#app { width: min(100%, 1500px); }
+.layout { max-width: 1120px; }
+.planet-panel { height: clamp(480px, 68vw, 760px); margin: 8px auto 12px; }
+.planet-panel::after { content: ''; position: absolute; inset: 0; pointer-events: none; border-radius: 24px; box-shadow: inset 0 0 70px rgba(8,10,18,.28); }
+#planet-canvas { inset: 0; }
+.country-explorer { display: grid; grid-template-columns: minmax(230px, .75fr) minmax(0, 1.25fr); gap: 22px; margin: 26px 0 30px; padding: 25px; border: 1px solid var(--line); border-radius: 20px; background: linear-gradient(145deg, rgba(24,26,45,.94), rgba(11,13,24,.96)); box-shadow: 0 22px 70px rgba(0,0,0,.22); }
+.explorer-heading { grid-column: 1 / -1; display: flex; align-items: start; justify-content: space-between; gap: 15px; }
+.explorer-heading .eyebrow { margin-bottom: 8px; }
+.explorer-heading h2 { margin: 0; font-size: clamp(22px, 3vw, 30px); letter-spacing: -.045em; }
+.explorer-copy { margin: 8px 0 0; color: #9298b0; font-size: 12px; line-height: 1.6; }
+.explorer-count { flex: 0 0 auto; padding: 8px 10px; border: 1px solid rgba(165,148,255,.24); border-radius: 30px; color: #c3b9ff; font: 9px 'DM Mono', monospace; }
+.country-browser { min-width: 0; }
+.country-search-label { display: block; margin-bottom: 8px; color: #9298b0; font: 9px 'DM Mono', monospace; letter-spacing: .1em; }
+#country-search { width: 100%; height: 42px; padding: 0 12px; border: 1px solid rgba(174,179,220,.17); border-radius: 9px; outline: none; color: #f1efff; background: rgba(5,7,15,.6); font: 12px 'Manrope', sans-serif; }
+#country-search:focus { border-color: rgba(165,148,255,.65); }
+.country-list { display: flex; flex-direction: column; gap: 4px; max-height: 390px; overflow: auto; margin-top: 10px; padding-right: 4px; scrollbar-color: #514777 transparent; }
+.country-choice { display: flex; align-items: center; gap: 10px; width: 100%; min-height: 38px; padding: 6px 9px; border: 1px solid transparent; border-radius: 8px; color: #d6d8e9; text-align: left; background: transparent; cursor: pointer; font-size: 11px; }
+.country-choice:hover, .country-choice.selected { border-color: rgba(165,148,255,.24); background: rgba(117,99,190,.13); }
+.country-choice small { margin-left: auto; color: #7f859d; font: 9px 'DM Mono', monospace; }
+.country-swatch { display: inline-block; flex: 0 0 auto; width: 13px; height: 13px; border: 1px solid rgba(255,255,255,.35); border-radius: 4px; background: var(--country-color); box-shadow: 0 0 12px color-mix(in srgb, var(--country-color), transparent 65%); }
+.country-detail { min-width: 0; min-height: 390px; padding: 20px; border: 1px solid rgba(174,179,220,.12); border-radius: 14px; background: rgba(5,7,15,.34); }
+.empty-country { display: flex; min-height: 340px; flex-direction: column; align-items: center; justify-content: center; text-align: center; }
+.empty-country span { color: #a99aff; font-size: 34px; }
+.empty-country strong { margin-top: 12px; color: #c6c0e7; font: 10px 'DM Mono', monospace; letter-spacing: .1em; }
+.empty-country p { max-width: 250px; color: #858ba3; font-size: 11px; line-height: 1.6; }
+.country-title-row { display: flex; align-items: center; gap: 13px; padding-bottom: 18px; border-bottom: 1px solid var(--line); }
+.country-title-row .country-swatch { width: 34px; height: 42px; border-radius: 7px; }
+.country-title-row .eyebrow { margin: 0 0 5px; font-size: 8px; }
+.country-title-row h3 { margin: 0; font-size: clamp(22px, 3vw, 30px); letter-spacing: -.04em; }
+.country-status { display: inline-block; margin-top: 6px; color: #a99aff; font: 8px 'DM Mono', monospace; letter-spacing: .07em; }
+.country-stat-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 9px; margin: 16px 0 20px; }
+.country-stat-grid > div { padding: 12px; border: 1px solid rgba(174,179,220,.1); border-radius: 9px; background: rgba(255,255,255,.025); }
+.country-stat-grid small { display: block; color: #81879f; font: 8px 'DM Mono', monospace; letter-spacing: .08em; }
+.country-stat-grid strong { display: block; margin-top: 7px; color: #e5e1ff; font-size: 17px; font-weight: 600; overflow-wrap: anywhere; }
+.country-info-heading { margin: 18px 0 9px; color: #a99aff; font: 9px 'DM Mono', monospace; letter-spacing: .1em; }
+.country-facts { margin: 0; }
+.country-facts div { display: flex; justify-content: space-between; gap: 12px; padding: 9px 0; border-bottom: 1px solid rgba(174,179,220,.08); font-size: 11px; }
+.country-facts dt { color: #8e94ac; }
+.country-facts dd { margin: 0; color: #d8d6eb; text-align: right; }
+.terrain-bars { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 7px; }
+.terrain-bars span { display: flex; justify-content: space-between; padding: 9px; border-radius: 7px; background: rgba(255,255,255,.035); color: #999fb5; font-size: 10px; }
+.terrain-bars b { color: #e2ddff; font: 10px 'DM Mono', monospace; }
+.country-footnote { margin: 15px 0 0; color: #777e98; font-size: 10px; line-height: 1.6; }
+@media (max-width: 700px) {
+  #app { padding: 0 12px; }
+  .layout { padding-top: 32px; }
+  .planet-panel { height: min(122vw, 560px); margin: 0 -8px 8px; }
+  .country-explorer { grid-template-columns: 1fr; gap: 16px; padding: 16px; margin-top: 18px; }
+  .explorer-heading { grid-column: auto; }
+  .country-list { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); max-height: 300px; }
+  .country-choice { min-width: 0; gap: 7px; font-size: 10px; }
+  .country-choice small { display: none; }
+  .country-detail { min-height: 0; padding: 14px; }
+  .empty-country { min-height: 180px; }
+  .country-stat-grid strong { font-size: 15px; }
+}
