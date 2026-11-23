@@ -305,11 +305,53 @@ export function generatePlanetWorld(seed = WORLD_SEED): PlanetWorld {
   const countrySurfaceWeights = new Array(COUNTRY_COUNT).fill(0) as number[];
   const landThreshold = scores[landIndices[landIndices.length - 1]];
   const cellWeights = new Float64Array(orderKeys.length);
-  // Assign only actual land cells to the nearest country seed.
-  // Each seed is itself a land cell, so every country is guaranteed at least
-  // one territory cell. Ocean remains unowned instead of influencing borders.
+  // Build an explicit owner lookup for the 100 seed cells. Seed ownership
+  // takes priority over distance calculations, guaranteeing every country
+  // starts with at least one land cell.
   const countryOwners = new Int16Array(orderKeys.length);
   countryOwners.fill(-1);
+  const seedOwnerByCell = new Int16Array(orderKeys.length);
+  seedOwnerByCell.fill(-1);
+  for (let country = 0; country < countrySeeds.length; country++) {
+    const seedIndex = countrySeeds[country].y * MAP_WIDTH + countrySeeds[country].x;
+    if (!rawLand[seedIndex]) {
+      throw new Error(`Country ${country + 1} seed ${seedIndex} is not land.`);
+    }
+    if (seedOwnerByCell[seedIndex] !== -1) {
+      throw new Error(`Countries ${seedOwnerByCell[seedIndex] + 1} and ${country + 1} share seed cell ${seedIndex}.`);
+    }
+    seedOwnerByCell[seedIndex] = country;
+  }
+  // Assign each land cell to its nearest seed, except seed cells which are
+  // pinned to their own country before the distance comparison.
+  for (const index of landIndices) {
+    const pinnedOwner = seedOwnerByCell[index];
+    if (pinnedOwner !== -1) {
+      countryOwners[index] = pinnedOwner;
+      continue;
+    }
+    const x = index % MAP_WIDTH;
+    const y = Math.floor(index / MAP_WIDTH);
+    let nearestCountry = -1;
+    let nearestDistance = Number.POSITIVE_INFINITY;
+    for (let country = 0; country < countrySeeds.length; country++) {
+      const dx = wrapDistanceX(x, countrySeeds[country].x);
+      const dy = y - countrySeeds[country].y;
+      const distance = dx * dx + dy * dy;
+      if (distance < nearestDistance) {
+        nearestDistance = distance;
+        nearestCountry = country;
+      }
+    }
+    if (nearestCountry < 0) throw new Error(`Land cell ${index} could not be assigned to a country.`);
+    countryOwners[index] = nearestCountry;
+  }
+  for (let country = 0; country < COUNTRY_COUNT; country++) {
+    const seedIndex = countrySeeds[country].y * MAP_WIDTH + countrySeeds[country].x;
+    if (countryOwners[seedIndex] !== country) {
+      throw new Error(`Country ${country + 1} seed ownership mismatch: expected ${country}, got ${countryOwners[seedIndex]}.`);
+    }
+  }
   for (const index of landIndices) {
     const x = index % MAP_WIDTH;
     const y = Math.floor(index / MAP_WIDTH);
@@ -340,7 +382,9 @@ export function generatePlanetWorld(seed = WORLD_SEED): PlanetWorld {
         continue;
       }
       const nearest = countryOwners[index];
-      if (nearest < 0 || nearest >= COUNTRY_COUNT) throw new Error(`Land cell ${index} has an invalid country owner.`);
+      if (nearest < 0 || nearest >= COUNTRY_COUNT) {
+        throw new Error(`Land cell ${index} has invalid owner ${nearest}; seed count=${countrySeeds.length}.`);
+      }
       const score = scores[index];
       const broadRelief = smoothNoise(x / (75 * MAP_SCALE), y / (57 * MAP_SCALE), seed + 201);
       const ridgeNoise = 1 - Math.abs(smoothNoise(x / (24 * MAP_SCALE), y / (21 * MAP_SCALE), seed + 207) * 2 - 1);
