@@ -11,6 +11,12 @@ if (!mount || !dateNode || !timeNode || !pauseButton || !statusNode) {
   throw new Error('MICROVERSE could not initialize: required interface element is missing.');
 }
 
+const mountElement = mount;
+const dateElement = dateNode;
+const timeElement = timeNode;
+const pauseElement = pauseButton;
+const statusElement = statusNode;
+
 const scene = new THREE.Scene();
 scene.background = new THREE.Color('#080a12');
 
@@ -22,7 +28,7 @@ renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.5));
 renderer.outputColorSpace = THREE.SRGBColorSpace;
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
 renderer.toneMappingExposure = 1.15;
-mount.appendChild(renderer.domElement);
+mountElement.appendChild(renderer.domElement);
 
 const ambient = new THREE.AmbientLight(0x8293c4, 1.15);
 scene.add(ambient);
@@ -187,8 +193,8 @@ renderer.domElement.addEventListener('touchmove', (event) => {
 renderer.domElement.addEventListener('touchend', () => { touchDistance = 0; }, { passive: true });
 
 function resize(): void {
-  const width = Math.max(1, mount.clientWidth);
-  const height = Math.max(1, mount.clientHeight);
+  const width = Math.max(1, mountElement.clientWidth);
+  const height = Math.max(1, mountElement.clientHeight);
   camera.aspect = width / height;
   camera.updateProjectionMatrix();
   renderer.setSize(width, height, false);
@@ -211,15 +217,15 @@ function renderClock(): void {
   const dayOfMonth = (dayOfYear % 30) + 1;
   const hours = Math.floor(minuteOfDay / 60);
   const minutes = minuteOfDay % 60;
-  dateNode.textContent = `DAY ${String(dayOfMonth).padStart(3, '0')} · MONTH ${String(month).padStart(2, '0')} · YEAR ${String(year).padStart(4, '0')}`;
-  timeNode.textContent = `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`;
+  dateElement.textContent = `DAY ${String(dayOfMonth).padStart(3, '0')} · MONTH ${String(month).padStart(2, '0')} · YEAR ${String(year).padStart(4, '0')}`;
+  timeElement.textContent = `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`;
 }
 
-pauseButton.addEventListener('click', () => {
+pauseElement.addEventListener('click', () => {
   running = !running;
-  pauseButton.innerHTML = running ? 'Ⅱ <span>PAUSE WORLD</span>' : '▶ <span>RESUME WORLD</span>';
-  statusNode.textContent = running ? 'SIMULATION RUNNING' : 'SIMULATION PAUSED';
-  statusNode.classList.toggle('paused', !running);
+  pauseElement.innerHTML = running ? 'Ⅱ <span>PAUSE WORLD</span>' : '▶ <span>RESUME WORLD</span>';
+  statusElement.textContent = running ? 'SIMULATION RUNNING' : 'SIMULATION PAUSED';
+  statusElement.classList.toggle('paused', !running);
   lastClockUpdate = performance.now();
 });
 
