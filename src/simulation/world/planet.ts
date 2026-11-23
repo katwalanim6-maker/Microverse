@@ -161,6 +161,7 @@ export function generatePlanetWorld(seed = WORLD_SEED): PlanetWorld {
   const cells: WorldCell[] = new Array(MAP_WIDTH * MAP_HEIGHT);
   const countryLandCounts = new Array(COUNTRY_NAMES.length).fill(0) as number[];
   const countryWeights = new Array(COUNTRY_NAMES.length).fill(0) as number[];
+  const cellWeights = new Float64Array(MAP_WIDTH * MAP_HEIGHT);
 
   for (let y = 0; y < MAP_HEIGHT; y++) {
     for (let x = 0; x < MAP_WIDTH; x++) {
@@ -182,15 +183,19 @@ export function generatePlanetWorld(seed = WORLD_SEED): PlanetWorld {
       }
       const score = elevation[index];
       const terrain: Terrain = score > 0.49 ? 'mountains' : score > 0.34 ? 'highlands' : 'plains';
-      const nearOcean = [
-        index - 1, index + 1, index - MAP_WIDTH, index + MAP_WIDTH
-      ].some((neighbor) => neighbor >= 0 && neighbor < rawLand.length && !rawLand[neighbor]);
+      const left = y * MAP_WIDTH + (x === 0 ? MAP_WIDTH - 1 : x - 1);
+      const right = y * MAP_WIDTH + (x === MAP_WIDTH - 1 ? 0 : x + 1);
+      const up = y > 0 ? index - MAP_WIDTH : -1;
+      const down = y < MAP_HEIGHT - 1 ? index + MAP_WIDTH : -1;
+      const nearOcean = [left, right, up, down].some((neighbor) => neighbor >= 0 && !rawLand[neighbor]);
       cells[index] = { terrain: nearOcean ? 'coast' : terrain, countryIndex: nearest, population: 0 };
       countryLandCounts[nearest]++;
       const latitudeFactor = 0.55 + (1 - Math.abs((y / MAP_HEIGHT) * 2 - 1)) * 0.45;
       const terrainFactor = terrain === 'mountains' ? 0.28 : terrain === 'highlands' ? 0.72 : 1;
       const coastFactor = nearOcean ? 1.25 : 1;
-      countryWeights[nearest] += latitudeFactor * terrainFactor * coastFactor;
+      const weight = latitudeFactor * terrainFactor * coastFactor;
+      cellWeights[index] = weight;
+      countryWeights[nearest] += weight;
     }
   }
 
@@ -215,10 +220,7 @@ export function generatePlanetWorld(seed = WORLD_SEED): PlanetWorld {
   for (let index = 0; index < cells.length; index++) {
     const cell = cells[index];
     if (cell.countryIndex < 0) continue;
-    const y = Math.floor(index / MAP_WIDTH);
-    const latitudeFactor = 0.55 + (1 - Math.abs((y / MAP_HEIGHT) * 2 - 1)) * 0.45;
-    const terrainFactor = cell.terrain === 'mountains' ? 0.28 : cell.terrain === 'highlands' ? 0.72 : 1;
-    const weight = latitudeFactor * terrainFactor * (cell.terrain === 'coast' ? 1.25 : 1);
+    const weight = cellWeights[index];
     const country = countries[cell.countryIndex];
     const allocation = Math.floor(country.population * weight / countryWeights[cell.countryIndex]);
     cell.population = allocation;
