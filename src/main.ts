@@ -101,8 +101,8 @@ const scene = new THREE.Scene();
 scene.background = new THREE.Color('#080a12');
 
 // Wide framing shows the Sun, Earth and Moon together at the starting zoom.
-const camera = new THREE.PerspectiveCamera(62, 1, 0.1, 120);
-camera.position.set(0, 0, 17.5);
+const camera = new THREE.PerspectiveCamera(72, 1, 0.1, 160);
+camera.position.set(0, 0, 28);
 // The observer camera orbits Earth; dragging never rotates the planet or celestial bodies.
 let cameraAzimuth = 0;
 let cameraPolar = Math.PI / 2;
@@ -249,7 +249,7 @@ const earthOrbit = new THREE.Group();
 scene.add(earthOrbit);
 
 // Slightly wider system spacing keeps the Sun clearly separated from Earth.
-const earthOrbitRadius = 4.4;
+const earthOrbitRadius = 8.8;
 const planetGroup = new THREE.Group();
 planetGroup.position.set(earthOrbitRadius, 0, 0);
 earthOrbit.add(planetGroup);
@@ -473,7 +473,7 @@ const moon = new THREE.Mesh(
   new THREE.MeshStandardMaterial({ color: 0xcbd5e8, roughness: 0.9, metalness: 0.02, emissive: 0x202b45 })
 );
 // The Moon remains closer than the Sun, but has a more readable orbital gap.
-moon.position.set(2.7, 0, 0);
+moon.position.set(7.4, 0, 0);
 moonOrbit.add(moon);
 const moonHalo = new THREE.Mesh(
   new THREE.SphereGeometry(0.38, 20, 16),
@@ -485,7 +485,7 @@ const activePointers = new Map<number, { x: number; y: number }>();
 const pointerStarts = new Map<number, { x: number; y: number }>();
 let pinchDistance = 0;
 let clickCandidate = false;
-let cameraDistance = 17.5;
+let cameraDistance = 28;
 
 function distanceBetweenPointers(): number {
   const points = [...activePointers.values()];
@@ -519,7 +519,7 @@ renderer.domElement.addEventListener('pointermove', (event) => {
       cameraDistance = THREE.MathUtils.clamp(
         cameraDistance + (pinchDistance - nextDistance) * 0.010,
         2.05,
-        24
+        40
       );
     }
     pinchDistance = nextDistance;
@@ -536,10 +536,10 @@ renderer.domElement.addEventListener('pointermove', (event) => {
   // Dragging moves the observer around Earth. The planet, Sun, Moon and stars
   // remain in their own world-space coordinate systems.
   const orbitSensitivity = 0.0052;
-  cameraAzimuth -= deltaX * orbitSensitivity;
+  cameraAzimuth += deltaX * orbitSensitivity;
   // Allow continuous vertical orbit through both poles for a full 360° observer orbit.
   // The spherical camera offset remains continuous as polar crosses 0 and PI.
-  cameraPolar += deltaY * orbitSensitivity;
+  cameraPolar -= deltaY * orbitSensitivity;
 });
 
 function selectCountryAtPointer(clientX: number, clientY: number): void {
@@ -600,7 +600,7 @@ renderer.domElement.addEventListener('pointerup', finishPointer);
 renderer.domElement.addEventListener('pointercancel', finishPointer);
 renderer.domElement.addEventListener('wheel', (event) => {
   event.preventDefault();
-  cameraDistance = THREE.MathUtils.clamp(cameraDistance + event.deltaY * 0.0025, 2.05, 24);
+  cameraDistance = THREE.MathUtils.clamp(cameraDistance + event.deltaY * 0.0025, 2.05, 40);
 }, { passive: false });
 
 function resize(): void {
