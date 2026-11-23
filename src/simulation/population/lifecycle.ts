@@ -137,3 +137,27 @@ export function validateInitialPopulation(countries: Country[], expectedPerCount
     }
   }
 }
+
+export function applyIndividualEvent(individual: Individual, event: PopulationEvent): Individual {
+  if (event.type === 'birth') {
+    throw new Error('Create a newborn with createIndividual, then record the birth in the population ledger.');
+  }
+  if (event.individualId !== individual.id) throw new Error('Event individual ID does not match the individual record.');
+  if (!individual.alive || individual.health === 'deceased') throw new Error('A deceased individual cannot receive further life events.');
+
+  if (event.type === 'death') {
+    if (event.countryId !== individual.countryId) throw new Error('Death country does not match current residence.');
+    return { ...individual, alive: false, health: 'deceased' };
+  }
+  if (event.type === 'migration') {
+    if (event.fromCountryId !== individual.countryId) throw new Error('Migration origin does not match current residence.');
+    return { ...individual, countryId: event.toCountryId };
+  }
+  if (event.countryId !== individual.countryId) throw new Error('Health event country does not match current residence.');
+  if (event.type === 'illness') {
+    if (individual.health !== 'healthy') throw new Error('Only a healthy individual can become ill in this initial model.');
+    return { ...individual, health: 'ill' };
+  }
+  if (individual.health !== 'ill') throw new Error('Only an ill individual can recover in this initial model.');
+  return { ...individual, health: 'recovering' };
+}
