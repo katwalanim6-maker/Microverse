@@ -39,8 +39,9 @@ Only modules required by the current milestone need to exist in code. Future mod
 ## 4. Rendering strategy
 
 Use an observer camera that can orbit continuously through a full 360° around Earth's centre, including over both poles, with drag and fixed-axis distance zoom (do not rotate the planet in response to pointer dragging or couple pinch gestures to camera orbit). The current atlas geography grid is 540 × 270 and includes:
-- Per-cell elevation, moisture, temperature and biome classification.
-- Procedural mountain/highland/plain relief and coastal terrain.
+- Per-cell elevation, moisture, temperature, biome, tectonic activity and volcanic-zone classification.
+- Eighteen deterministic moving tectonic plates; convergent and divergent boundaries contribute to uplift and volcanic regions.
+- Procedural mountain/highland/plain relief and coastal terrain, with geology feeding the same elevation field used by the 3D mesh.
 - Deterministic drainage paths that mark river cells.
 - Country-aware natural terrain colouring and visible political boundaries.
 - A high-resolution displaced 3D mesh whose vertex radius follows smoothly interpolated elevation and land/ocean height fields.
