@@ -33,6 +33,21 @@
 
         <div class="world-summary" id="world-summary">GENERATING WORLD DATA...</div>
 
+        <section class="country-explorer" aria-label="Country information explorer">
+          <div class="explorer-heading">
+            <div><p class="eyebrow">WORLD ATLAS // COUNTRY DATABASE</p><h2>Explore the nations</h2><p class="explorer-copy">Select a territory on the globe or choose a country below to inspect its profile.</p></div>
+            <span class="explorer-count">100 NATIONS</span>
+          </div>
+          <div class="country-browser">
+            <label class="country-search-label" for="country-search">FIND A COUNTRY</label>
+            <input id="country-search" type="search" placeholder="Search country names..." autocomplete="off" />
+            <div id="country-list" class="country-list" aria-label="Countries"></div>
+          </div>
+          <article id="country-detail" class="country-detail" aria-live="polite">
+            <div class="empty-country"><span>◎</span><strong>NO COUNTRY SELECTED</strong><p>Select one of the 100 territories to open its information tab.</p></div>
+          </article>
+        </section>
+
         <section class="control-panel">
           <div class="section-heading"><span>SIMULATION CLOCK</span><span class="status-pill">YEAR 0000</span></div>
           <div class="clock-readout">
