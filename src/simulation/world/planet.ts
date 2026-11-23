@@ -3,8 +3,9 @@ export const INITIAL_POPULATION_PER_COUNTRY = 1_000_000;
 export const COUNTRY_COUNT = 100;
 export const INITIAL_POPULATION = COUNTRY_COUNT * INITIAL_POPULATION_PER_COUNTRY;
 export const TARGET_LAND_PERCENT = 73;
-export const MAP_WIDTH = 1620;
-export const MAP_HEIGHT = 810;
+export const MAP_WIDTH = 540;
+export const MAP_HEIGHT = 270;
+const MAP_SCALE = MAP_WIDTH / 1620;
 
 export type Terrain = 'ocean' | 'coast' | 'plains' | 'highlands' | 'mountains';
 export type Biome = 'ocean' | 'coast' | 'grassland' | 'forest' | 'desert' | 'tundra' | 'alpine';
@@ -110,7 +111,7 @@ function generateTectonicPlates(seed: number): TectonicPlate[] {
     const speed = 0.25 + rand() * 0.75;
     return {
       x: rand() * MAP_WIDTH,
-      y: 36 + rand() * (MAP_HEIGHT - 72),
+      y: 36 * MAP_SCALE + rand() * (MAP_HEIGHT - 72 * MAP_SCALE),
       vx: Math.cos(angle) * speed,
       vy: Math.sin(angle) * speed
     };
@@ -156,7 +157,7 @@ function sampleTectonics(x: number, y: number, plates: TectonicPlate[]): {
   const convergence = Math.max(0, Math.min(1, 0.5 - relativeMotion * 0.9));
   const divergence = Math.max(0, Math.min(1, 0.5 + relativeMotion * 0.9));
   const boundaryGap = Math.max(0, Math.sqrt(secondDistance) - Math.sqrt(nearestDistance));
-  const boundaryInfluence = Math.exp(-boundaryGap / 22.5);
+  const boundaryInfluence = Math.exp(-boundaryGap / (22.5 * MAP_SCALE));
   const activity = boundaryInfluence * Math.min(1, 0.35 + Math.abs(relativeMotion));
   const uplift = boundaryInfluence * (0.035 + convergence * 0.29);
   return {
@@ -176,9 +177,9 @@ function generateLandmasses(rand: () => number): Landmass[] {
   for (let i = 0; i < 9; i++) {
     masses.push({
       x: rand() * MAP_WIDTH,
-      y: 54 + rand() * (MAP_HEIGHT - 108),
-      rx: 81 + rand() * 138,
-      ry: 48 + rand() * 99,
+      y: 54 * MAP_SCALE + rand() * (MAP_HEIGHT - 108 * MAP_SCALE),
+      rx: (81 + rand() * 138) * MAP_SCALE,
+      ry: (48 + rand() * 99) * MAP_SCALE,
       rotation: (rand() - 0.5) * 1.2,
       strength: 0.78 + rand() * 0.22
     });
@@ -199,9 +200,9 @@ function landScore(x: number, y: number, masses: Landmass[], seed: number): numb
     continental = Math.max(continental, influence);
   }
   return continental
-    + (smoothNoise(x / 135, y / 99, seed) - 0.5) * 0.28
-    + (smoothNoise(x / 40.5, y / 36, seed + 91) - 0.5) * 0.12
-    + (smoothNoise(x / 15.75, y / 15.75, seed + 177) - 0.5) * 0.045;
+    + (smoothNoise(x / (135 * MAP_SCALE), y / (99 * MAP_SCALE), seed) - 0.5) * 0.28
+    + (smoothNoise(x / (40.5 * MAP_SCALE), y / (36 * MAP_SCALE), seed + 91) - 0.5) * 0.12
+    + (smoothNoise(x / (15.75 * MAP_SCALE), y / (15.75 * MAP_SCALE), seed + 177) - 0.5) * 0.045;
 }
 
 function selectCountrySeeds(landIndices: number[], rand: () => number): CountrySeed[] {
@@ -347,9 +348,9 @@ export function generatePlanetWorld(seed = WORLD_SEED): PlanetWorld {
       }
       const nearest = countryOwners[index];
       const score = scores[index];
-      const broadRelief = smoothNoise(x / 75, y / 57, seed + 201);
-      const ridgeNoise = 1 - Math.abs(smoothNoise(x / 24, y / 21, seed + 207) * 2 - 1);
-      const fineRelief = smoothNoise(x / 9.6, y / 9.6, seed + 209);
+      const broadRelief = smoothNoise(x / (75 * MAP_SCALE), y / (57 * MAP_SCALE), seed + 201);
+      const ridgeNoise = 1 - Math.abs(smoothNoise(x / (24 * MAP_SCALE), y / (21 * MAP_SCALE), seed + 207) * 2 - 1);
+      const fineRelief = smoothNoise(x / (9.6 * MAP_SCALE), y / (9.6 * MAP_SCALE), seed + 209);
       const tectonics = sampleTectonics(x, y, tectonicPlates);
       const relativeElevation = Math.max(0, Math.min(1,
         ((score - landThreshold) / 0.62) * 0.56 + broadRelief * 0.14 + ridgeNoise * 0.12 + fineRelief * 0.05 + tectonics.uplift + tectonics.activity * 0.08
@@ -363,8 +364,8 @@ export function generatePlanetWorld(seed = WORLD_SEED): PlanetWorld {
       const terrain: Terrain = nearOcean ? 'coast' : baseTerrain;
       const latitude = 1 - Math.abs((y / (MAP_HEIGHT - 1)) * 2 - 1);
       const moisture = Math.max(0, Math.min(1,
-        smoothNoise(x / 19, y / 14, seed + 311) * 0.55
-        + smoothNoise(x / 5.5, y / 4.5, seed + 313) * 0.25
+        smoothNoise(x / (19 * MAP_SCALE), y / (14 * MAP_SCALE), seed + 311) * 0.55
+        + smoothNoise(x / (5.5 * MAP_SCALE), y / (4.5 * MAP_SCALE), seed + 313) * 0.25
         + (nearOcean ? 0.16 : 0.04)
       ));
       const temperature = Math.max(0, Math.min(1, latitude * 0.92 + 0.08 - relativeElevation * 0.22));
