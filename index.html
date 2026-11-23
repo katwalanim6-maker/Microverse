@@ -10,14 +10,18 @@
   <body>
     <div id="app">
       <header class="topbar">
-        <a class="brand" href="/" aria-label="Microverse home">
+        <a class="brand" href="#world" aria-label="Microverse home">
           <span class="brand-mark">M</span>
           <span><strong>MICROVERSE</strong><small>WORLD OBSERVATORY</small></span>
         </a>
+        <nav class="page-nav" aria-label="Main navigation">
+          <button class="nav-button active" type="button" data-page="world">WORLD</button>
+          <button class="nav-button" type="button" data-page="info">INFORMATION</button>
+        </nav>
         <span class="live-indicator"><i></i> GENESIS</span>
       </header>
 
-      <main class="layout">
+      <main class="layout">\n        <section id="world-page" class="app-page">
         <section class="intro">
           <p class="eyebrow">WORLD ARCHITECT // OBSERVER MODE</p>
           <h1>A world waiting<br /><em>to become.</em></h1>
@@ -28,28 +32,15 @@
           <div id="planet-canvas"></div>
           <div class="planet-label"><span class="label-dot"></span> PLANETARY BODY <b>MV-001</b></div>
           <div class="coordinates">GENESIS SECTOR <span>00° 00′</span></div>
-          <div class="planet-hint">DRAG TO ROTATE · PINCH TO ZOOM</div>
+          <div class="planet-hint">DRAG TO ROTATE · PINCH TO ZOOM</div>\n          <div id="zoom-level" class="zoom-level">PLANET VIEW · GLOBAL DETAIL</div>
         </section>
 
         <div class="world-summary" id="world-summary">GENERATING WORLD DATA...</div>
 
-        <section class="country-explorer" aria-label="Country information explorer">
-          <div class="explorer-heading">
-            <div><p class="eyebrow">WORLD ATLAS // COUNTRY DATABASE</p><h2>Explore the nations</h2><p class="explorer-copy">Select a territory on the globe or choose a country below to inspect its profile.</p></div>
-            <span class="explorer-count">100 NATIONS</span>
-          </div>
-          <div class="country-browser">
-            <label class="country-search-label" for="country-search">FIND A COUNTRY</label>
-            <input id="country-search" type="search" placeholder="Search country names..." autocomplete="off" />
-            <div id="country-list" class="country-list" aria-label="Countries"></div>
-          </div>
-          <article id="country-detail" class="country-detail" aria-live="polite">
-            <div class="empty-country"><span>◎</span><strong>NO COUNTRY SELECTED</strong><p>Select one of the 100 territories to open its information tab.</p></div>
-          </article>
-        </section>
+
 
         <section class="control-panel">
-          <div class="section-heading"><span>SIMULATION CLOCK</span><span class="status-pill">YEAR 0000</span></div>
+          <div class="section-heading"><span>SIMULATION CLOCK</span><span id="world-year" class="status-pill">YEAR 0000</span></div>
           <div class="clock-readout">
             <div><small>WORLD DATE</small><strong id="world-date">DAY 001 · MONTH 01</strong></div>
             <div class="time-value"><small>LOCAL TIME</small><strong id="world-time">00:00</strong></div>
@@ -64,6 +55,31 @@
         <section class="foundation-note">
           <div class="note-icon">✳</div>
           <div><strong>GENESIS PROTOCOL</strong><p>The planet is taking shape. Population, societies, economies and infrastructure will be introduced in their own tested milestones.</p></div>
+        </section>
+        </section>
+        <section id="info-page" class="app-page" hidden>
+          <div class="info-page-heading">
+            <div>
+              <p class="eyebrow">WORLD DATABASE // OBSERVER MODE</p>
+              <h1>World <em>information.</em></h1>
+              <p class="intro-copy">Explore all 100 countries and inspect their geography, population and evolving civilization records.</p>
+            </div>
+            <button id="back-to-world" class="secondary-button" type="button">← BACK TO WORLD</button>
+          </div>
+          <section class="country-explorer" aria-label="Country information explorer">
+            <div class="explorer-heading">
+              <div><p class="eyebrow">PLANETARY ATLAS // COUNTRY DATABASE</p><h2>Explore the nations</h2><p class="explorer-copy">Choose a country here, or tap a territory on the globe to open its profile.</p></div>
+              <span class="explorer-count">100 NATIONS</span>
+            </div>
+            <div class="country-browser">
+              <label class="country-search-label" for="country-search">FIND A COUNTRY</label>
+              <input id="country-search" type="search" placeholder="Search country names..." autocomplete="off" />
+              <div id="country-list" class="country-list" aria-label="Countries"></div>
+            </div>
+            <article id="country-detail" class="country-detail" aria-live="polite">
+              <div class="empty-country"><span>◎</span><strong>NO COUNTRY SELECTED</strong><p>Select one of the 100 territories to open its information profile.</p></div>
+            </article>
+          </section>
         </section>
       </main>
 
