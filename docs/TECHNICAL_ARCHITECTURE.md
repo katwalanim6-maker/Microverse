@@ -38,12 +38,14 @@ Only modules required by the current milestone need to exist in code. Future mod
 
 ## 4. Rendering strategy
 
-Use a globe-first camera with orbit controls. The current atlas geography grid is 540 × 270 and includes:
+Use a globe-first camera with explicit drag rotation and fixed-axis zoom (do not couple pinch gestures to rotation). The current atlas geography grid is 540 × 270 and includes:
 - Per-cell elevation, moisture, temperature and biome classification.
 - Procedural mountain/highland/plain relief and coastal terrain.
 - Deterministic drainage paths that mark river cells.
 - Country-aware natural terrain colouring and visible political boundaries.
-- A displaced 3D sphere mesh whose vertex radius follows the generated elevation field.
+- A high-resolution displaced 3D mesh whose vertex radius follows smoothly interpolated elevation and land/ocean height fields.
+- Separate smooth Catmull–Rom country-border curves projected onto the terrain surface; borders are geometry, not darkened map pixels.
+- A fixed-axis zoom camera; pinch zoom is isolated from drag rotation so zoom gestures cannot spin the planet.
 
 Zoom tiers:
 - Planet: globe, continents, oceans and broad borders.
