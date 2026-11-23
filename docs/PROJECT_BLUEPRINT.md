@@ -11,12 +11,16 @@ The observer is the **World Architect**: able to inspect the world and establish
 | Dimension | Initial rule |
 |---|---|
 | World | Entirely fictional planet |
-| Initial population | 1,000,000 in each of 100 countries (100,000,000 total) |\n| Countries | 100 |\n| Land / ocean | 73% land, 27% ocean |
+| Countries | 100 |
+| Starting population | 1,000,000 in each country; 100,000,000 globally |
+| Land / ocean | Target 73% land and 27% ocean by spherical surface weighting |
 | Starting history | Primitive settlements, Year 0 |
 | Time scale | 1 real second = 1 simulation minute |
 | Governance | Emerges locally; no mandatory global government |
 | Progression | No required technological or political path |
 | Observer | World Architect / observer |
+
+The current atlas uses a finite equirectangular grid. It selects whole grid cells using latitude-based spherical area weights, so the measured land percentage is a close grid-resolution approximation to 73%, not a claim of infinitely precise geometry. The displayed percentage is rounded to a whole percent.
 
 Time conversion:
 - 1 simulation hour = 1 real minute.
@@ -26,9 +30,11 @@ Time conversion:
 
 The clock must support pause, resume, save/load and controlled speed changes. Elapsed simulation time must not be lost merely because a browser tab is backgrounded.
 
-## 3. Planet and environment\n\nThe initial atlas targets exactly 73% land cells and 27% ocean cells on its equirectangular world grid. The world begins with 100 countries, each assigned exactly 1,000,000 inhabitants (100,000,000 total). Country names and colours are generated from a fixed catalogue so identities remain stable for a given version.
+## 3. Planet and environment
 
-The planet contains continents, oceans, islands, mountains, rivers, plains, forests, deserts, climate zones, natural resources and ecosystems. Geography and resource distribution should influence where settlements emerge and what they can produce.
+The initial atlas generates a reproducible fictional geography and 100 distinct country territories. Each country begins with exactly 1,000,000 inhabitants. Country identities and colours are stable for a given world-generation version and seed.
+
+The planet will progressively gain rivers, climate, biomes, natural resources and ecosystems. Geography and resource distribution should influence where settlements emerge and what they can produce.
 
 ## 4. Individuals and minds
 
@@ -43,7 +49,13 @@ Every inhabitant is an individual, not merely a population counter. Each persist
 
 A person's future must not be hard-coded from their parents' profession or social position. A farmer's child may pursue any available ambition, subject to opportunity, learning and circumstance.
 
-### Life cycle and population change\n\nIndividuals are born into the world, age through life stages, can become ill and recover, and eventually die. Migration moves living individuals between regions and across country borders; migration updates both origin and destination population totals and records a migration event. Births, deaths, illness, recovery and migration are explicit historical events, not unexplained changes to a counter. Health outcomes depend on healthcare access, environment, age and other later-defined simulation factors. No individual is guaranteed a fixed lifespan.\n\n### Scalable mind simulation
+### Life cycle and population change
+
+Individuals are born, age through life stages, can become ill and recover, migrate between regions or countries, and eventually die. These changes must be represented as explicit, ordered events. Births increase the relevant population; deaths decrease it; cross-border migration transfers one resident from the origin to the destination without changing the global total. Illness and recovery change health state but not population totals.
+
+The first population module now defines individual identity records, age/life-stage helpers, a country population ledger and validated birth, death, migration, illness and recovery events. This is a foundation for the later scheduler and does not instantiate or continuously process 100 million detailed individual objects.
+
+### Scalable mind simulation
 
 All inhabitants receive persistent identity and compact behavioral state. Scheduling is event-driven and priority-based: nearby, changing or socially important situations receive more computation, while quiet populations can be advanced through efficient aggregate rules. Detailed language-model reasoning is an optional tool for selected situations, not a per-person-per-tick requirement.
 
