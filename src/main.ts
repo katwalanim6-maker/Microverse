@@ -436,7 +436,7 @@ const starGeometry = new THREE.BufferGeometry();
 const starPositions: number[] = [];
 const starRand = random(99173);
 for (let i = 0; i < 1500; i++) {
-  const radius = 9 + starRand() * 23;
+  const radius = 45 + starRand() * 30;
   const theta = starRand() * Math.PI * 2;
   const phi = Math.acos(2 * starRand() - 1);
   starPositions.push(
@@ -447,7 +447,7 @@ for (let i = 0; i < 1500; i++) {
 }
 starGeometry.setAttribute('position', new THREE.Float32BufferAttribute(starPositions, 3));
 const starMaterial = new THREE.PointsMaterial({
-  color: 0xdce2ff, size: 0.028, transparent: true, opacity: 0.78, sizeAttenuation: true
+  color: 0xdce2ff, size: 0.045, transparent: true, opacity: 0.78, sizeAttenuation: true
 });
 const stars = new THREE.Points(starGeometry, starMaterial);
 scene.add(stars);
