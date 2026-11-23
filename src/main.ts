@@ -8,6 +8,9 @@ const timeNode = document.querySelector<HTMLElement>('#world-time');
 const pauseButton = document.querySelector<HTMLButtonElement>('#pause-button');
 const statusNode = document.querySelector<HTMLElement>('#clock-status');
 const summaryNode = document.querySelector<HTMLElement>('#world-summary');
+const countryListNode = document.querySelector<HTMLElement>('#country-list');
+const countryDetailNode = document.querySelector<HTMLElement>('#country-detail');
+const countrySearchNode = document.querySelector<HTMLInputElement>('#country-search');
 
 if (!mount || !dateNode || !timeNode || !pauseButton || !statusNode) {
   throw new Error('MICROVERSE could not initialize: required interface element is missing.');
@@ -21,11 +24,62 @@ const statusElement = statusNode;
 const world: PlanetWorld = generatePlanetWorld();
 if (summaryNode) summaryNode.textContent = getWorldSummary(world);
 
+function showCountry(country: PlanetWorld['countries'][number]): void {
+  if (!countryDetailNode) return;
+  const countryCells = world.cells.filter((cell) => cell.countryIndex === world.countries.indexOf(country));
+  const terrainCount = { plains: 0, highlands: 0, mountains: 0, coast: 0 };
+  for (const cell of countryCells) {
+    if (cell.terrain in terrainCount) terrainCount[cell.terrain as keyof typeof terrainCount]++;
+  }
+  const landShare = (country.landCells / world.cells.filter((cell) => cell.countryIndex >= 0).length) * world.landPercent;
+  const density = country.landCells > 0 ? country.population / country.landCells : 0;
+  countryDetailNode.innerHTML = `
+    <div class="country-title-row"><span class="country-swatch" style="--country-color:${country.color}"></span><div><p class="eyebrow">COUNTRY PROFILE // ${country.id.toUpperCase()}</p><h3>${country.name}</h3><span class="country-status">FOUNDATION STATUS: ${country.status.toUpperCase()}</span></div></div>
+    <div class="country-stat-grid">
+      <div><small>POPULATION</small><strong>${country.population.toLocaleString('en-US')}</strong></div>
+      <div><small>LAND CELLS</small><strong>${country.landCells.toLocaleString('en-US')}</strong></div>
+      <div><small>SHARE OF LAND</small><strong>${landShare.toFixed(2)}%</strong></div>
+      <div><small>PEOPLE / CELL</small><strong>${Math.round(density).toLocaleString('en-US')}</strong></div>
+    </div>
+    <div class="country-info-heading">NATIONAL INFORMATION</div>
+    <dl class="country-facts">
+      <div><dt>Capital</dt><dd>${country.capital ?? 'Not established'}</dd></div>
+      <div><dt>Government</dt><dd>${country.government}</dd></div>
+      <div><dt>Currency</dt><dd>${country.currency}</dd></div>
+      <div><dt>Economic model</dt><dd>${country.economy}</dd></div>
+      <div><dt>Founded</dt><dd>${country.foundedYear === null ? 'Not established' : `Year ${country.foundedYear}`}</dd></div>
+    </dl>
+    <div class="country-info-heading">GEOGRAPHY</div>
+    <div class="terrain-bars">
+      <span>Plains <b>${terrainCount.plains}</b></span><span>Highlands <b>${terrainCount.highlands}</b></span><span>Mountains <b>${terrainCount.mountains}</b></span><span>Coastal cells <b>${terrainCount.coast}</b></span>
+    </div>
+    <p class="country-footnote">Government, capital, currency and economic details will emerge as the civilization develops. They are intentionally not pre-assigned.</p>`;
+  countryListNode?.querySelectorAll<HTMLButtonElement>('.country-choice').forEach((button) => {
+    button.classList.toggle('selected', button.dataset.countryId === country.id);
+  });
+}
+function renderCountryList(filter = ''): void {
+  if (!countryListNode) return;
+  const normalized = filter.trim().toLocaleLowerCase();
+  const matches = world.countries.filter((country) => country.name.toLocaleLowerCase().includes(normalized));
+  countryListNode.innerHTML = matches.map((country) =>
+    `<button class="country-choice" type="button" data-country-id="${country.id}"><span class="country-swatch" style="--country-color:${country.color}"></span><span>${country.name}</span><small>${country.population.toLocaleString('en-US')}</small></button>`
+  ).join('');
+  countryListNode.querySelectorAll<HTMLButtonElement>('.country-choice').forEach((button) => {
+    button.addEventListener('click', () => {
+      const country = world.countries.find((item) => item.id === button.dataset.countryId);
+      if (country) showCountry(country);
+    });
+  });
+}
+renderCountryList();
+countrySearchNode?.addEventListener('input', () => renderCountryList(countrySearchNode.value));
+
 const scene = new THREE.Scene();
 scene.background = new THREE.Color('#080a12');
 
 const camera = new THREE.PerspectiveCamera(38, 1, 0.1, 100);
-camera.position.set(0, 0, 5.3);
+camera.position.set(0, 0, 4.65);
 
 const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false });
 renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.5));
@@ -132,7 +186,7 @@ function createPlanetTexture(worldData: PlanetWorld): THREE.CanvasTexture {
 const planetGroup = new THREE.Group();
 scene.add(planetGroup);
 
-const planetGeometry = new THREE.SphereGeometry(1.55, 96, 64);
+const planetGeometry = new THREE.SphereGeometry(1.72, 128, 96);
 const planetMaterial = new THREE.MeshStandardMaterial({
   map: createPlanetTexture(world),
   roughness: 0.92,
@@ -142,7 +196,7 @@ const planet = new THREE.Mesh(planetGeometry, planetMaterial);
 planetGroup.add(planet);
 
 const atmosphere = new THREE.Mesh(
-  new THREE.SphereGeometry(1.61, 64, 48),
+  new THREE.SphereGeometry(1.79, 96, 64),
   new THREE.MeshBasicMaterial({ color: 0x688cff, transparent: true, opacity: 0.10, side: THREE.BackSide })
 );
 planetGroup.add(atmosphere);
@@ -170,15 +224,19 @@ scene.add(stars);
 let dragging = false;
 let previousX = 0;
 let previousY = 0;
+let pointerStartX = 0;
+let pointerStartY = 0;
 let targetRotationY = 0.35;
 let targetRotationX = 0.12;
-let cameraDistance = 5.3;
+let cameraDistance = 4.65;
 
 renderer.domElement.addEventListener('pointerdown', (event) => {
   if (event.button !== 0 && event.pointerType === 'mouse') return;
   dragging = true;
   previousX = event.clientX;
   previousY = event.clientY;
+  pointerStartX = event.clientX;
+  pointerStartY = event.clientY;
   renderer.domElement.setPointerCapture(event.pointerId);
 });
 renderer.domElement.addEventListener('pointermove', (event) => {
@@ -197,13 +255,33 @@ renderer.domElement.addEventListener('pointermove', (event) => {
   previousX = event.clientX;
   previousY = event.clientY;
 });
-const stopDrag = () => { dragging = false; };
+function selectCountryAtPointer(clientX: number, clientY: number): void {
+  const rect = renderer.domElement.getBoundingClientRect();
+  const pointer = new THREE.Vector2(
+    ((clientX - rect.left) / rect.width) * 2 - 1,
+    -((clientY - rect.top) / rect.height) * 2 + 1
+  );
+  const raycaster = new THREE.Raycaster();
+  raycaster.setFromCamera(pointer, camera);
+  const hit = raycaster.intersectObject(planet, false)[0];
+  const uv = hit?.uv;
+  if (!uv) return;
+  const x = Math.min(world.width - 1, Math.max(0, Math.floor(uv.x * world.width)));
+  const y = Math.min(world.height - 1, Math.max(0, Math.floor((1 - uv.y) * world.height)));
+  const cell = world.cells[y * world.width + x];
+  if (cell && cell.countryIndex >= 0) showCountry(world.countries[cell.countryIndex]);
+}
+const stopDrag = (event: PointerEvent) => {
+  const wasClick = Math.hypot(event.clientX - pointerStartX, event.clientY - pointerStartY) < 7;
+  dragging = false;
+  if (wasClick) selectCountryAtPointer(event.clientX, event.clientY);
+};
 renderer.domElement.addEventListener('pointerup', stopDrag);
-renderer.domElement.addEventListener('pointercancel', stopDrag);
+renderer.domElement.addEventListener('pointercancel', () => { dragging = false; });
 renderer.domElement.addEventListener('lostpointercapture', stopDrag);
 renderer.domElement.addEventListener('wheel', (event) => {
   event.preventDefault();
-  cameraDistance = THREE.MathUtils.clamp(cameraDistance + event.deltaY * 0.004, 3.5, 8);
+  cameraDistance = THREE.MathUtils.clamp(cameraDistance + event.deltaY * 0.003, 2.15, 9.5);
 }, { passive: false });
 
 let touchDistance = 0;
