@@ -100,8 +100,9 @@ countrySearchNode?.addEventListener('input', () => renderCountryList(countrySear
 const scene = new THREE.Scene();
 scene.background = new THREE.Color('#080a12');
 
-const camera = new THREE.PerspectiveCamera(38, 1, 0.1, 100);
-camera.position.set(0, 0, 4.65);
+// Wide framing shows the Sun, Earth and Moon together at the starting zoom.
+const camera = new THREE.PerspectiveCamera(62, 1, 0.1, 120);
+camera.position.set(0, 0, 17.5);
 
 const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false });
 renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.5));
@@ -236,12 +237,23 @@ function createPlanetTexture(worldData: PlanetWorld): THREE.CanvasTexture {
   texture.anisotropy = renderer.capabilities.getMaxAnisotropy();
   return texture;
 }
+// Hierarchical orbital mechanics: the Earth and Moon share the Sun-centred
+// yearly orbit, while the Moon has its own monthly orbit around Earth's position.
+const earthOrbit = new THREE.Group();
+scene.add(earthOrbit);
+
+const earthOrbitRadius = 3.5;
 const planetGroup = new THREE.Group();
-scene.add(planetGroup);
-// Manual user rotation stays on the outer group. The inner group supplies the
-// independent daily axial spin, leaving the sun, moon and stars fixed in space.
+planetGroup.position.set(earthOrbitRadius, 0, 0);
+earthOrbit.add(planetGroup);
+
+// Manual globe manipulation and the planet's own daily spin are independent.
 const planetSpin = new THREE.Group();
 planetGroup.add(planetSpin);
+
+const moonOrbit = new THREE.Group();
+moonOrbit.position.set(earthOrbitRadius, 0, 0);
+earthOrbit.add(moonOrbit);
 
 function sampleSurface(u: number, v: number): { elevation: number; land: number } {
   const wrappedU = ((u % 1) + 1) % 1;
@@ -440,12 +452,12 @@ scene.add(stars);
 // Celestial objects occupy fixed world-space positions. The planet rotates beneath
 // the fixed sun to create the day/night cycle; manual globe dragging never moves them.
 const sun = new THREE.Mesh(
-  new THREE.SphereGeometry(0.42, 32, 24),
+  new THREE.SphereGeometry(0.92, 40, 32),
   new THREE.MeshBasicMaterial({ color: 0xffd27a })
 );
 scene.add(sun);
 const sunGlow = new THREE.Mesh(
-  new THREE.SphereGeometry(0.66, 24, 16),
+  new THREE.SphereGeometry(1.28, 32, 24),
   new THREE.MeshBasicMaterial({ color: 0xffb84d, transparent: true, opacity: 0.16, side: THREE.BackSide })
 );
 sun.add(sunGlow);
@@ -453,7 +465,8 @@ const moon = new THREE.Mesh(
   new THREE.SphereGeometry(0.25, 32, 24),
   new THREE.MeshStandardMaterial({ color: 0xcbd5e8, roughness: 0.9, metalness: 0.02, emissive: 0x202b45 })
 );
-scene.add(moon);
+moon.position.set(2.35, 0, 0);
+moonOrbit.add(moon);
 const moonHalo = new THREE.Mesh(
   new THREE.SphereGeometry(0.38, 20, 16),
   new THREE.MeshBasicMaterial({ color: 0x9eb8ff, transparent: true, opacity: 0.12, side: THREE.BackSide })
@@ -466,7 +479,7 @@ let dragging = false;
 let pinchZoomActive = false;
 let pinchDistance = 0;
 let clickCandidate = false;
-let cameraDistance = 4.65;
+let cameraDistance = 17.5;
 
 function distanceBetweenPointers(): number {
   const points = [...activePointers.values()];
@@ -502,8 +515,8 @@ renderer.domElement.addEventListener('pointermove', (event) => {
     if (pinchDistance > 0 && nextDistance > 0) {
       cameraDistance = THREE.MathUtils.clamp(
         cameraDistance + (pinchDistance - nextDistance) * 0.010,
-        1.94,
-        12
+        2.05,
+        24
       );
     }
     pinchDistance = nextDistance;
@@ -587,7 +600,7 @@ renderer.domElement.addEventListener('pointerup', finishPointer);
 renderer.domElement.addEventListener('pointercancel', finishPointer);
 renderer.domElement.addEventListener('wheel', (event) => {
   event.preventDefault();
-  cameraDistance = THREE.MathUtils.clamp(cameraDistance + event.deltaY * 0.0025, 1.94, 12);
+  cameraDistance = THREE.MathUtils.clamp(cameraDistance + event.deltaY * 0.0025, 2.05, 24);
 }, { passive: false });
 
 function resize(): void {
@@ -669,21 +682,36 @@ function animate(now: number): void {
   renderClock();
   const zoomLabel = cameraDistance < 2.45 ? 'CLOSE VIEW · ELEVATION & RIVERS' : cameraDistance < 3.4 ? 'LOCAL VIEW · TERRAIN & BIOMES' : cameraDistance < 4.8 ? 'REGIONAL VIEW · COUNTRY GEOGRAPHY' : cameraDistance < 6.5 ? 'CONTINENT VIEW · NATIONAL BORDERS' : 'PLANET VIEW · GLOBAL DETAIL';
   if (zoomLevelNode && zoomLevelNode.textContent !== zoomLabel) zoomLevelNode.textContent = zoomLabel;
-  camera.position.set(0, 0, cameraDistance);
-  camera.lookAt(0, 0, 0);
-
+  // Orbital periods follow the world's calendar:
+  // Earth day = 1,440 simulation minutes; Moon month = 30 days;
+  // Earth year = 365 days. The Sun remains at the solar-system origin.
   const dayAngle = (simulationMinutes / 1440) * Math.PI * 2;
-  // Keep both bodies inside the narrow portrait camera view, above the horizon.
-  const sunPosition = new THREE.Vector3(-1.15, 3.15, 11);
-  const moonPosition = new THREE.Vector3(1.15, 3.15, 11);
-  sun.position.copy(sunPosition);
-  keyLight.position.copy(sunPosition);
-  moon.position.copy(moonPosition);
-  moonLight.position.copy(moonPosition);
-  // One complete axial rotation equals one simulated day (24 real minutes).
-  // The stars remain a stationary backdrop rather than rotating with the planet.
+  const monthAngle = (simulationMinutes / (30 * 1440)) * Math.PI * 2;
+  const yearAngle = (simulationMinutes / (365 * 1440)) * Math.PI * 2;
+
+  earthOrbit.rotation.y = yearAngle;
+  moonOrbit.rotation.y = monthAngle;
   planetSpin.rotation.y = dayAngle;
-  starMaterial.opacity = 0.72;
+
+  // The camera follows Earth's centre so the world remains comfortably framed,
+  // while the Sun and Moon move naturally through the sky relative to the observer.
+  earthOrbit.updateMatrixWorld(true);
+  const earthPosition = planetGroup.getWorldPosition(new THREE.Vector3());
+  const moonPosition = moon.getWorldPosition(new THREE.Vector3());
+  camera.position.set(
+    earthPosition.x,
+    earthPosition.y,
+    earthPosition.z + cameraDistance
+  );
+  camera.lookAt(earthPosition);
+
+  // Directional sunlight comes from the actual fixed Sun position and points
+  // toward Earth. Moonlight follows the Moon's actual orbital position.
+  keyLight.position.copy(sun.position);
+  keyLight.target.position.copy(earthPosition);
+  moonLight.position.copy(moonPosition);
+  moonLight.target.position.copy(earthPosition);
+  starMaterial.opacity = 0.78;
   renderer.render(scene, camera);
 }
 renderClock();
