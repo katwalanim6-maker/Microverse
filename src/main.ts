@@ -287,7 +287,7 @@ function sampleSurface(u: number, v: number): { elevation: number; land: number 
   };
 }
 
-const planetGeometry = new THREE.SphereGeometry(1.72, 1080, 540);
+const planetGeometry = new THREE.SphereGeometry(1.72, 720, 360);
 const positions = planetGeometry.getAttribute('position');
 const uvs = planetGeometry.getAttribute('uv');
 for (let vertex = 0; vertex < positions.count; vertex++) {
