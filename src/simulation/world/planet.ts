@@ -43,6 +43,8 @@ export interface WorldCell {
   temperature: number;
   biome: Biome;
   river: boolean;
+  tectonicActivity: number;
+  volcanic: boolean;
 }
 
 export interface PlanetWorld {
@@ -93,6 +95,76 @@ interface Landmass {
 }
 
 interface CountrySeed { x: number; y: number; }
+
+interface TectonicPlate {
+  x: number;
+  y: number;
+  vx: number;
+  vy: number;
+}
+
+function generateTectonicPlates(seed: number): TectonicPlate[] {
+  const rand = seededRandom(seed + 74021);
+  return Array.from({ length: 18 }, () => {
+    const angle = rand() * Math.PI * 2;
+    const speed = 0.25 + rand() * 0.75;
+    return {
+      x: rand() * MAP_WIDTH,
+      y: 12 + rand() * (MAP_HEIGHT - 24),
+      vx: Math.cos(angle) * speed,
+      vy: Math.sin(angle) * speed
+    };
+  });
+}
+
+function signedWrapDeltaX(from: number, to: number): number {
+  let delta = to - from;
+  if (delta > MAP_WIDTH / 2) delta -= MAP_WIDTH;
+  if (delta < -MAP_WIDTH / 2) delta += MAP_WIDTH;
+  return delta;
+}
+
+function sampleTectonics(x: number, y: number, plates: TectonicPlate[]): {
+  activity: number;
+  uplift: number;
+  volcanic: boolean;
+} {
+  let nearest = plates[0];
+  let second = plates[1];
+  let nearestDistance = Number.POSITIVE_INFINITY;
+  let secondDistance = Number.POSITIVE_INFINITY;
+  for (const plate of plates) {
+    const dx = wrapDistanceX(x, plate.x);
+    const dy = y - plate.y;
+    const distance = dx * dx + dy * dy;
+    if (distance < nearestDistance) {
+      second = nearest;
+      secondDistance = nearestDistance;
+      nearest = plate;
+      nearestDistance = distance;
+    } else if (distance < secondDistance) {
+      second = plate;
+      secondDistance = distance;
+    }
+  }
+  const nxRaw = signedWrapDeltaX(nearest.x, second.x);
+  const nyRaw = second.y - nearest.y;
+  const normalLength = Math.hypot(nxRaw, nyRaw) || 1;
+  const nx = nxRaw / normalLength;
+  const ny = nyRaw / normalLength;
+  const relativeMotion = (second.vx - nearest.vx) * nx + (second.vy - nearest.vy) * ny;
+  const convergence = Math.max(0, Math.min(1, 0.5 - relativeMotion * 0.9));
+  const divergence = Math.max(0, Math.min(1, 0.5 + relativeMotion * 0.9));
+  const boundaryGap = Math.max(0, Math.sqrt(secondDistance) - Math.sqrt(nearestDistance));
+  const boundaryInfluence = Math.exp(-boundaryGap / 7.5);
+  const activity = boundaryInfluence * Math.min(1, 0.35 + Math.abs(relativeMotion));
+  const uplift = boundaryInfluence * (0.035 + convergence * 0.29);
+  return {
+    activity,
+    uplift,
+    volcanic: boundaryInfluence > 0.46 && (convergence > 0.66 || divergence > 0.66)
+  };
+}
 
 function wrapDistanceX(a: number, b: number): number {
   const direct = Math.abs(a - b);
@@ -172,6 +244,7 @@ function selectCountrySeeds(landIndices: number[], rand: () => number): CountryS
 export function generatePlanetWorld(seed = WORLD_SEED): PlanetWorld {
   const rand = seededRandom(seed);
   const masses = generateLandmasses(rand);
+  const tectonicPlates = generateTectonicPlates(seed);
   const scores = new Float32Array(MAP_WIDTH * MAP_HEIGHT);
   const ranked: Array<{ index: number; score: number; surfaceWeight: number }> = [];
   let totalSurfaceWeight = 0;
@@ -230,7 +303,7 @@ export function generatePlanetWorld(seed = WORLD_SEED): PlanetWorld {
     for (let x = 0; x < MAP_WIDTH; x++) {
       const index = y * MAP_WIDTH + x;
       if (!rawLand[index]) {
-        cells[index] = { terrain: 'ocean', countryIndex: -1, population: 0, elevation: 0, moisture: 0, temperature: 0, biome: 'ocean', river: false };
+        cells[index] = { terrain: 'ocean', countryIndex: -1, population: 0, elevation: 0, moisture: 0, temperature: 0, biome: 'ocean', river: false, tectonicActivity: 0, volcanic: false };
         continue;
       }
       let nearest = 0;
@@ -248,8 +321,9 @@ export function generatePlanetWorld(seed = WORLD_SEED): PlanetWorld {
       const broadRelief = smoothNoise(x / 25, y / 19, seed + 201);
       const ridgeNoise = 1 - Math.abs(smoothNoise(x / 8, y / 7, seed + 207) * 2 - 1);
       const fineRelief = smoothNoise(x / 3.2, y / 3.2, seed + 209);
+      const tectonics = sampleTectonics(x, y, tectonicPlates);
       const relativeElevation = Math.max(0, Math.min(1,
-        ((score - landThreshold) / 0.62) * 0.62 + broadRelief * 0.18 + ridgeNoise * 0.14 + fineRelief * 0.06
+        ((score - landThreshold) / 0.62) * 0.56 + broadRelief * 0.14 + ridgeNoise * 0.12 + fineRelief * 0.05 + tectonics.uplift + tectonics.activity * 0.08
       ));
       const baseTerrain: Terrain = relativeElevation > 0.72 ? 'mountains' : relativeElevation > 0.39 ? 'highlands' : 'plains';
       const left = y * MAP_WIDTH + (x === 0 ? MAP_WIDTH - 1 : x - 1);
@@ -273,7 +347,8 @@ export function generatePlanetWorld(seed = WORLD_SEED): PlanetWorld {
         : 'grassland';
       cells[index] = {
         terrain, countryIndex: nearest, population: 0,
-        elevation: relativeElevation, moisture, temperature, biome, river: false
+        elevation: relativeElevation, moisture, temperature, biome, river: false,
+        tectonicActivity: tectonics.activity, volcanic: tectonics.volcanic
       };
       countryLandCounts[nearest]++;
       const latitudeFactor = 0.55 + latitude * 0.45;
