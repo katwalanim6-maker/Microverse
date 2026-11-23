@@ -177,6 +177,25 @@ function createPlanetTexture(worldData: PlanetWorld): THREE.CanvasTexture {
   context.imageSmoothingEnabled = true;
   context.drawImage(mapCanvas, 0, 0, canvas.width, canvas.height);
 
+  // Deterministic terrain micro-relief becomes visible as the camera zooms closer.
+  const detailRand = random(worldData.seed + 1907);
+  for (let i = 0; i < 14500; i++) {
+    const px = detailRand() * canvas.width;
+    const py = detailRand() * canvas.height;
+    const cellX = Math.min(worldData.width - 1, Math.floor(px / canvas.width * worldData.width));
+    const cellY = Math.min(worldData.height - 1, Math.floor(py / canvas.height * worldData.height));
+    const cell = worldData.cells[cellY * worldData.width + cellX];
+    if (!cell || cell.countryIndex < 0) continue;
+    const size = 0.5 + detailRand() * (cell.terrain === 'mountains' ? 3.8 : 2.2);
+    const alpha = 0.025 + detailRand() * (cell.terrain === 'mountains' ? 0.12 : 0.065);
+    context.beginPath();
+    context.ellipse(px, py, size * (1.2 + detailRand()), size * 0.45, detailRand() * Math.PI, 0, Math.PI * 2);
+    context.fillStyle = cell.terrain === 'mountains'
+      ? `rgba(238, 229, 211, ${alpha})`
+      : `rgba(8, 12, 18, ${alpha})`;
+    context.fill();
+  }
+
   // Fine atmospheric streaks sit above the authoritative geography layer.
   const rand = random(worldData.seed + 701);
   for (let i = 0; i < 420; i++) {
@@ -199,7 +218,7 @@ function createPlanetTexture(worldData: PlanetWorld): THREE.CanvasTexture {
 const planetGroup = new THREE.Group();
 scene.add(planetGroup);
 
-const planetGeometry = new THREE.SphereGeometry(1.72, 128, 96);
+const planetGeometry = new THREE.SphereGeometry(1.72, 192, 128);
 const planetMaterial = new THREE.MeshStandardMaterial({
   map: createPlanetTexture(world),
   roughness: 0.92,
@@ -376,7 +395,7 @@ function saveClock(): void {
     localStorage.setItem(CLOCK_STORAGE_KEY, JSON.stringify({
       version: 1,
       seed: world.seed,
-      simulationMinutes,
+      simulationMinutes: simulationMinutes + Math.max(0, Date.now() - lastWallClockMs) / 1000,
       savedAt: Date.now()
     }));
   } catch {
