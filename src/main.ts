@@ -665,7 +665,7 @@ function animate(now: number): void {
   camera.position.set(0, 0, cameraDistance);
   camera.lookAt(0, 0, 0);
 
-  const dayAngle = (simulationMinutes / 1440) * Math.PI * 2 - Math.PI / 2;
+  const dayAngle = (simulationMinutes / 1440) * Math.PI * 2 + Math.PI / 2;
   const orbitRadius = 13;
   const sunPosition = new THREE.Vector3(
     Math.cos(dayAngle) * orbitRadius,
