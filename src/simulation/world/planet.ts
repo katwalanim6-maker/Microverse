@@ -320,12 +320,17 @@ export function generatePlanetWorld(seed = WORLD_SEED): PlanetWorld {
     const owner = countryOwners[index];
     const x = index % MAP_WIDTH;
     const y = Math.floor(index / MAP_WIDTH);
-    const neighbors = [y * MAP_WIDTH + (x === 0 ? MAP_WIDTH - 1 : x - 1), y * MAP_WIDTH + (x + 1 === MAP_WIDTH ? 0 : x + 1), y > 0 ? index - MAP_WIDTH : -1, y + 1 < MAP_HEIGHT ? index + MAP_WIDTH : -1];
-    for (const neighbor of neighbors) {
-      if (neighbor >= 0 && countryOwners[neighbor] < 0) {
-        countryOwners[neighbor] = owner;
-        ownerQueue[queueTail++] = neighbor;
-      }
+    const left = y * MAP_WIDTH + (x === 0 ? MAP_WIDTH - 1 : x - 1);
+    const right = y * MAP_WIDTH + (x + 1 === MAP_WIDTH ? 0 : x + 1);
+    if (countryOwners[left] < 0) { countryOwners[left] = owner; ownerQueue[queueTail++] = left; }
+    if (countryOwners[right] < 0) { countryOwners[right] = owner; ownerQueue[queueTail++] = right; }
+    if (y > 0) {
+      const up = index - MAP_WIDTH;
+      if (countryOwners[up] < 0) { countryOwners[up] = owner; ownerQueue[queueTail++] = up; }
+    }
+    if (y + 1 < MAP_HEIGHT) {
+      const down = index + MAP_WIDTH;
+      if (countryOwners[down] < 0) { countryOwners[down] = owner; ownerQueue[queueTail++] = down; }
     }
   }
   const riverSources = new Int32Array(COUNTRY_COUNT);
