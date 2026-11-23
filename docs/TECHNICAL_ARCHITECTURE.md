@@ -38,13 +38,20 @@ Only modules required by the current milestone need to exist in code. Future mod
 
 ## 4. Rendering strategy
 
-Use a globe-first camera with orbit controls. Later zoom tiers:
-- Planet: globe, continents, oceans and broad borders.
-- Regional: countries, provinces, terrain, roads and settlements.
-- Local: buildings, inhabitants and vehicles.
-- Site: individual homes, factories, warehouses and institutions.
+Use a globe-first camera with orbit controls. The current atlas geography grid is 540 × 270 and includes:
+- Per-cell elevation, moisture, temperature and biome classification.
+- Procedural mountain/highland/plain relief and coastal terrain.
+- Deterministic drainage paths that mark river cells.
+- Country-aware natural terrain colouring and visible political boundaries.
+- A displaced 3D sphere mesh whose vertex radius follows the generated elevation field.
 
-Use level of detail (LOD). Distant regions should use simplified geometry and aggregated markers. Close-up detail is loaded only for the observed area. Cap device pixel ratio and avoid rendering a million individual meshes.
+Zoom tiers:
+- Planet: globe, continents, oceans and broad borders.
+- Regional: country territories, relief, biomes, river systems and coastlines.
+- Local: future provinces, watersheds, settlements and road corridors.
+- Site: future individual homes, factories, warehouses and institutions.
+
+The next rendering stage should introduce regional tile/mesh LOD and streamed high-resolution overlays. Distant regions stay simplified; only the observed area receives the most expensive detail. Cap device pixel ratio and avoid rendering a million individual meshes. The target is perceptually sharp detail, not unlimited or physically infinite resolution.
 
 ## 5. Simulation time
 
