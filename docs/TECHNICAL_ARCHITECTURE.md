@@ -14,7 +14,7 @@ The simulation core is authoritative. The 3D renderer is a client of simulation 
 - Railway for hosting the web application.
 - GitHub for source control and milestone history.
 
-## 3. Proposed module boundaries
+## 3. Module boundaries
 
 ```text
 src/
@@ -23,18 +23,18 @@ src/
   simulation/
     clock/         Simulation clock and time conversion
     world/         World state and geography data
-    population/    Individual identity and population scheduling
+    population/    Individual lifecycle, ledger and event scheduling
     society/       Households, communities and institutions
     governance/    Laws, policies and political systems
-    economy/       Markets, currencies, firms and accounting
-    industry/      Factories, production and inventory
-    logistics/     Routes, vehicles, shipments and delivery
+    economy/        Markets, currencies, firms and accounting
+    industry/       Factories, production and inventory
+    logistics/      Routes, vehicles, shipments and delivery
   ui/              Observer interface and panels
   storage/         Save/load and schema versioning
   shared/          Types, constants and utilities
 ```
 
-Only modules required by the current milestone need to exist in code. Future folders should be introduced when their contracts are defined.
+Only modules required by the current milestone need to exist in code. Future modules are introduced when their contracts are defined.
 
 ## 4. Rendering strategy
 
@@ -58,19 +58,26 @@ The constitutional rate is one simulation minute per real second. The clock shou
 
 Rendering frame rate must never define simulation time.
 
-## 6. Population scale
+## 6. Population scale and lifecycle
 
-One million inhabitants is a data and simulation target, not a requirement to instantiate one million detailed 3D objects or run one million LLM prompts continuously.
+The starting world contains 100 countries with 1,000,000 inhabitants each: 100,000,000 globally. This is a population total, not a requirement to instantiate 100 million detailed JavaScript objects at startup.
 
-Use compact records, event queues, spatial partitioning, coarse regional aggregation and selective detailed updates. Define measurable performance budgets before increasing active-agent detail.
+The first lifecycle module defines:
+- Compact individual identity and residence records.
+- Age-in-days and life-stage helpers.
+- A country population ledger.
+- Explicit birth, death, migration, illness and recovery events.
+- Invariants: births add one resident, deaths remove one resident, cross-border migration transfers one resident without changing global population, and illness/recovery do not change population totals.
+
+The next stage adds individual state transitions, event scheduling, family/social records, healthcare access and demographic models. Use event queues, spatial partitioning, regional aggregation and selective detailed updates. Detailed language-model reasoning is an optional tool for selected situations, not a per-person-per-tick requirement.
 
 ## 7. Persistence
 
-Persist versioned world snapshots and event/checkpoint data. A save should include world seed, simulation time, population state, institutions, economy and pending events as those systems are introduced. Migrations must be explicit and tested.
+Persist versioned world snapshots and event/checkpoint data. A save should include world seed, simulation time, population ledger, individual records as they are materialized, institutions, economy and pending events as those systems are introduced. Migrations must be explicit and tested.
 
 ## 8. Testing strategy
 
-- Unit tests for time, deterministic generation and economic calculations.
+- Unit tests for time, deterministic generation, life-stage boundaries and population events.
 - Integration tests for cross-module state changes.
 - Simulation tests for long-run stability and plausible emergent outcomes.
 - Performance tests on target phones.
