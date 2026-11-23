@@ -261,7 +261,7 @@ export function generatePlanetWorld(seed = WORLD_SEED): PlanetWorld {
       const latitudeRadians = ((0.5 - y / MAP_HEIGHT) * Math.PI);
       const surfaceWeight = Math.cos(latitudeRadians);
       totalSurfaceWeight += surfaceWeight;
-      orderKeys[index] = (Math.fround(score) + 2) * orderScale + index;
+      orderKeys[index] = (Math.fround(score) + 32) * orderScale + index;
     }
   }
 
