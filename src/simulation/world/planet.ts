@@ -262,7 +262,10 @@ export function generatePlanetWorld(seed = WORLD_SEED): PlanetWorld {
       const latitudeRadians = ((0.5 - y / MAP_HEIGHT) * Math.PI);
       const surfaceWeight = Math.cos(latitudeRadians);
       totalSurfaceWeight += surfaceWeight;
-      orderKeys[index] = (Math.fround(score) + 32) * orderScale + index;
+      // Quantize score to an integer before packing. Fractional score values
+      // cannot be recovered safely with modulo after multiplication.
+      const scoreBucket = Math.round(score * 100000) + 100000;
+      orderKeys[index] = scoreBucket * orderScale + index;
     }
   }
 
@@ -351,23 +354,6 @@ export function generatePlanetWorld(seed = WORLD_SEED): PlanetWorld {
     if (countryOwners[seedIndex] !== country) {
       throw new Error(`Country ${country + 1} seed ownership mismatch: expected ${country}, got ${countryOwners[seedIndex]}.`);
     }
-  }
-  for (const index of landIndices) {
-    const x = index % MAP_WIDTH;
-    const y = Math.floor(index / MAP_WIDTH);
-    let nearestCountry = -1;
-    let nearestDistance = Number.POSITIVE_INFINITY;
-    for (let country = 0; country < countrySeeds.length; country++) {
-      const dx = wrapDistanceX(x, countrySeeds[country].x);
-      const dy = y - countrySeeds[country].y;
-      const distance = dx * dx + dy * dy;
-      if (distance < nearestDistance) {
-        nearestDistance = distance;
-        nearestCountry = country;
-      }
-    }
-    if (nearestCountry < 0) throw new Error('A land cell could not be assigned to a country.');
-    countryOwners[index] = nearestCountry;
   }
   const riverSources = new Int32Array(COUNTRY_COUNT);
   riverSources.fill(-1);
