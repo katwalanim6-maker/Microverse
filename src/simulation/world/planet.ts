@@ -176,7 +176,7 @@ function generateLandmasses(rand: () => number): Landmass[] {
   for (let i = 0; i < 9; i++) {
     masses.push({
       x: rand() * MAP_WIDTH,
-      y: 18 + rand() * (MAP_HEIGHT - 36),
+      y: 54 + rand() * (MAP_HEIGHT - 108),
       rx: 81 + rand() * 138,
       ry: 48 + rand() * 99,
       rotation: (rand() - 0.5) * 1.2,
@@ -298,12 +298,12 @@ export function generatePlanetWorld(seed = WORLD_SEED): PlanetWorld {
   }
 
   const countrySeeds = selectCountrySeeds(landIndices, rand);
-  const cells: WorldCell[] = new Array(ranked.length);
+  const cells: WorldCell[] = new Array(orderKeys.length);
   const countryLandCounts = new Array(COUNTRY_COUNT).fill(0) as number[];
   const countryWeights = new Array(COUNTRY_COUNT).fill(0) as number[];
   const countrySurfaceWeights = new Array(COUNTRY_COUNT).fill(0) as number[];
   const landThreshold = scores[landIndices[landIndices.length - 1]];
-  const cellWeights = new Float64Array(ranked.length);
+  const cellWeights = new Float64Array(orderKeys.length);
 
   for (let y = 0; y < MAP_HEIGHT; y++) {
     for (let x = 0; x < MAP_WIDTH; x++) {
