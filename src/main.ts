@@ -167,10 +167,7 @@ function createPlanetTexture(worldData: PlanetWorld): THREE.CanvasTexture {
       const down = y + 1 < worldData.height ? worldData.cells[(y + 1) * worldData.width + x] : null;
       const left = worldData.cells[y * worldData.width + (x === 0 ? worldData.width - 1 : x - 1)];
       const up = y > 0 ? worldData.cells[(y - 1) * worldData.width + x] : cell;
-      const border = cell.countryIndex >= 0 && (
-        (right.countryIndex >= 0 && right.countryIndex !== cell.countryIndex)
-        || (down !== null && down.countryIndex >= 0 && down.countryIndex !== cell.countryIndex)
-      );
+      // Political borders are rendered as independent smooth 3D curves, not texture pixels.
       if (cell.countryIndex < 0) {
         const depth = Math.round(8 + cell.elevation * 13);
         image.data[offset] = 8;
@@ -184,7 +181,7 @@ function createPlanetTexture(worldData: PlanetWorld): THREE.CanvasTexture {
       const slopeShade = Math.max(0.72, Math.min(1.28, 1 + (left.elevation - right.elevation) * 0.85 + (up.elevation - (down?.elevation ?? cell.elevation)) * 0.85));
       const altitudeShade = 0.84 + cell.elevation * 0.30;
       const countryMix = 0.13;
-      const borderShade = border ? 0.48 : 1;
+      const borderShade = 1;
       const riverColor: [number, number, number] = [48, 133, 180];
       for (let channel = 0; channel < 3; channel++) {
         const natural = base[channel] * (1 - countryMix) + tint[channel] * countryMix;
@@ -240,26 +237,164 @@ function createPlanetTexture(worldData: PlanetWorld): THREE.CanvasTexture {
 const planetGroup = new THREE.Group();
 scene.add(planetGroup);
 
-const planetGeometry = new THREE.SphereGeometry(1.72, 540, 270);
+function sampleSurface(u: number, v: number): { elevation: number; land: number } {
+  const wrappedU = ((u % 1) + 1) % 1;
+  const gx = wrappedU * world.width - 0.5;
+  const gy = THREE.MathUtils.clamp((1 - v) * world.height - 0.5, 0, world.height - 1);
+  const x0Raw = Math.floor(gx);
+  const x0 = (x0Raw % world.width + world.width) % world.width;
+  const x1 = (x0 + 1) % world.width;
+  const y0 = Math.floor(gy);
+  const y1 = Math.min(world.height - 1, y0 + 1);
+  const tx = gx - x0Raw;
+  const ty = gy - y0;
+  const a = world.cells[y0 * world.width + x0];
+  const b = world.cells[y0 * world.width + x1];
+  const c = world.cells[y1 * world.width + x0];
+  const d = world.cells[y1 * world.width + x1];
+  const blend = (av: number, bv: number, cv: number, dv: number) =>
+    (av * (1 - tx) + bv * tx) * (1 - ty) + (cv * (1 - tx) + dv * tx) * ty;
+  return {
+    elevation: blend(a.elevation, b.elevation, c.elevation, d.elevation),
+    land: blend(a.countryIndex >= 0 ? 1 : 0, b.countryIndex >= 0 ? 1 : 0, c.countryIndex >= 0 ? 1 : 0, d.countryIndex >= 0 ? 1 : 0)
+  };
+}
+
+const planetGeometry = new THREE.SphereGeometry(1.72, 720, 360);
 const positions = planetGeometry.getAttribute('position');
 const uvs = planetGeometry.getAttribute('uv');
 for (let vertex = 0; vertex < positions.count; vertex++) {
   const u = uvs.getX(vertex);
   const v = uvs.getY(vertex);
-  const gx = Math.min(world.width - 1, Math.max(0, Math.floor(u * world.width)));
-  const gy = Math.min(world.height - 1, Math.max(0, Math.floor((1 - v) * world.height)));
-  const cell = world.cells[gy * world.width + gx];
+  const sample = sampleSurface(u, v);
   const nx = positions.getX(vertex);
   const ny = positions.getY(vertex);
   const nz = positions.getZ(vertex);
   const length = Math.hypot(nx, ny, nz) || 1;
-  const relief = cell.countryIndex < 0 ? 0 : 0.008 + cell.elevation * 0.105;
-  const fineNoise = cell.countryIndex < 0 ? 0 : (Math.sin(u * 920 + world.seed) * Math.sin(v * 670 + world.seed * 0.31)) * 0.0018;
-  const radius = 1.72 + relief + fineNoise;
+  // Land and ocean both have real relief. Bilinear sampling softens grid seams,
+  // while the higher-amplitude elevation field makes mountains physically visible.
+  const broadDetail = Math.sin(u * 92 + world.seed * 0.001) * Math.sin(v * 61 + world.seed * 0.002);
+  const fineDetail = Math.sin(u * 410 + world.seed * 0.003) * Math.sin(v * 290 + world.seed * 0.004);
+  const landHeight = 0.028 + sample.elevation * 0.235 + broadDetail * 0.006 + fineDetail * 0.0018;
+  const oceanDepth = -0.018 + sample.elevation * 0.018;
+  const radius = 1.72 + oceanDepth * (1 - sample.land) + landHeight * sample.land;
   positions.setXYZ(vertex, nx / length * radius, ny / length * radius, nz / length * radius);
 }
 planetGeometry.computeVertexNormals();
 planetGeometry.computeBoundingSphere();
+
+function createCountryBorderOverlay(worldData: PlanetWorld): THREE.LineSegments {
+  type BorderEdge = { a: string; b: string };
+  type GridPoint = { x: number; y: number };
+  const edges: BorderEdge[] = [];
+  const points = new Map<string, GridPoint>();
+  const adjacency = new Map<string, number[]>();
+  const pointKey = (x: number, y: number) => {
+    const wrappedX = (x % worldData.width + worldData.width) % worldData.width;
+    return `${wrappedX},${y}`;
+  };
+  const addEdge = (ax: number, ay: number, bx: number, by: number) => {
+    const a = pointKey(ax, ay);
+    const b = pointKey(bx, by);
+    if (a === b) return;
+    points.set(a, { x: (ax % worldData.width + worldData.width) % worldData.width, y: ay });
+    points.set(b, { x: (bx % worldData.width + worldData.width) % worldData.width, y: by });
+    const edgeIndex = edges.length;
+    edges.push({ a, b });
+    const aList = adjacency.get(a) ?? [];
+    aList.push(edgeIndex);
+    adjacency.set(a, aList);
+    const bList = adjacency.get(b) ?? [];
+    bList.push(edgeIndex);
+    adjacency.set(b, bList);
+  };
+
+  for (let y = 0; y < worldData.height; y++) {
+    for (let x = 0; x < worldData.width; x++) {
+      const current = worldData.cells[y * worldData.width + x];
+      if (current.countryIndex < 0) continue;
+      const right = worldData.cells[y * worldData.width + ((x + 1) % worldData.width)];
+      if (right.countryIndex >= 0 && right.countryIndex !== current.countryIndex) {
+        addEdge(x + 1, y, x + 1, y + 1);
+      }
+      if (y + 1 < worldData.height) {
+        const below = worldData.cells[(y + 1) * worldData.width + x];
+        if (below.countryIndex >= 0 && below.countryIndex !== current.countryIndex) {
+          addEdge(x, y + 1, x + 1, y + 1);
+        }
+      }
+    }
+  }
+
+  const used = new Uint8Array(edges.length);
+  const linePositions: number[] = [];
+  const surfacePoint = (point: GridPoint): THREE.Vector3 => {
+    const u = point.x / worldData.width;
+    const v = 1 - point.y / worldData.height;
+    const sample = sampleSurface(u, v);
+    const phi = u * Math.PI * 2;
+    const theta = (1 - v) * Math.PI;
+    const radius = 1.72 + 0.035 + sample.elevation * 0.235;
+    return new THREE.Vector3(
+      -Math.cos(phi) * Math.sin(theta) * radius,
+      Math.cos(theta) * radius,
+      Math.sin(phi) * Math.sin(theta) * radius
+    );
+  };
+  const walk = (start: string, firstEdge: number): string[] => {
+    const path = [start];
+    let current = start;
+    let edgeIndex = firstEdge;
+    while (!used[edgeIndex]) {
+      used[edgeIndex] = 1;
+      const edge = edges[edgeIndex];
+      const next = edge.a === current ? edge.b : edge.a;
+      path.push(next);
+      if (next === start) break;
+      const nextEdges = (adjacency.get(next) ?? []).filter((candidate) => !used[candidate]);
+      if (nextEdges.length !== 1) break;
+      current = next;
+      edgeIndex = nextEdges[0];
+    }
+    return path;
+  };
+  const addSmoothPath = (path: string[]) => {
+    if (path.length < 3) return;
+    const closed = path[0] === path[path.length - 1];
+    const keys = closed ? path.slice(0, -1) : path;
+    if (keys.length < 3) return;
+    const vectors = keys.map((key) => surfacePoint(points.get(key)!));
+    const curve = new THREE.CatmullRomCurve3(vectors, closed, 'centripetal', 0.5);
+    const smooth = curve.getPoints(Math.max(16, keys.length * 4));
+    for (let i = 0; i < smooth.length - 1; i++) {
+      linePositions.push(
+        smooth[i].x, smooth[i].y, smooth[i].z,
+        smooth[i + 1].x, smooth[i + 1].y, smooth[i + 1].z
+      );
+    }
+  };
+
+  // Start at junctions and open ends first, then consume remaining closed loops.
+  for (const [key, linked] of adjacency) {
+    if (linked.length === 2) continue;
+    for (const edgeIndex of linked) {
+      if (!used[edgeIndex]) addSmoothPath(walk(key, edgeIndex));
+    }
+  }
+  for (let edgeIndex = 0; edgeIndex < edges.length; edgeIndex++) {
+    if (!used[edgeIndex]) addSmoothPath(walk(edges[edgeIndex].a, edgeIndex));
+  }
+
+  const geometry = new THREE.BufferGeometry();
+  geometry.setAttribute('position', new THREE.Float32BufferAttribute(linePositions, 3));
+  const material = new THREE.LineBasicMaterial({
+    color: 0xe8e4ff,
+    transparent: true,
+    opacity: 0.82,
+    depthWrite: false
+  });
+  return new THREE.LineSegments(geometry, material);
+}
 const planetMaterial = new THREE.MeshStandardMaterial({
   map: createPlanetTexture(world),
   roughness: 0.92,
@@ -267,6 +402,8 @@ const planetMaterial = new THREE.MeshStandardMaterial({
 });
 const planet = new THREE.Mesh(planetGeometry, planetMaterial);
 planetGroup.add(planet);
+const countryBorders = createCountryBorderOverlay(world);
+planetGroup.add(countryBorders);
 
 const atmosphere = new THREE.Mesh(
   new THREE.SphereGeometry(1.79, 96, 64),
@@ -313,7 +450,7 @@ renderer.domElement.addEventListener('pointerdown', (event) => {
   renderer.domElement.setPointerCapture(event.pointerId);
 });
 renderer.domElement.addEventListener('pointermove', (event) => {
-  if (!dragging) return;
+  if (!dragging || pinchZoomActive) return;
   const deltaX = event.clientX - previousX;
   const deltaY = event.clientY - previousY;
 
@@ -371,8 +508,11 @@ renderer.domElement.addEventListener('wheel', (event) => {
 }, { passive: false });
 
 let touchDistance = 0;
+let pinchZoomActive = false;
 renderer.domElement.addEventListener('touchstart', (event) => {
   if (event.touches.length === 2) {
+    pinchZoomActive = true;
+    dragging = false;
     const a = event.touches[0];
     const b = event.touches[1];
     touchDistance = Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY);
@@ -386,7 +526,12 @@ renderer.domElement.addEventListener('touchmove', (event) => {
   cameraDistance = THREE.MathUtils.clamp(cameraDistance + (touchDistance - nextDistance) * 0.010, 1.94, 9.5);
   touchDistance = nextDistance;
 }, { passive: true });
-renderer.domElement.addEventListener('touchend', () => { touchDistance = 0; }, { passive: true });
+renderer.domElement.addEventListener('touchend', (event) => {
+  if (event.touches.length < 2) {
+    touchDistance = 0;
+    pinchZoomActive = false;
+  }
+}, { passive: true });
 
 function resize(): void {
   const width = Math.max(1, mountElement.clientWidth);
@@ -471,7 +616,8 @@ function animate(now: number): void {
   const rotationFollow = dragging ? 0.42 : 0.16;
   planetGroup.rotation.y += (targetRotationY - planetGroup.rotation.y) * rotationFollow;
   planetGroup.rotation.x += (targetRotationX - planetGroup.rotation.x) * rotationFollow;
-  camera.position.z += (cameraDistance - camera.position.z) * 0.08;
+  camera.position.set(0, 0, cameraDistance);
+  camera.lookAt(0, 0, 0);
   stars.rotation.y += 0.00004;
   renderer.render(scene, camera);
 }
@@ -484,5 +630,7 @@ window.addEventListener('beforeunload', () => {
   renderer.dispose();
   planetGeometry.dispose();
   planetMaterial.dispose();
+  countryBorders.geometry.dispose();
+  (countryBorders.material as THREE.Material).dispose();
   starGeometry.dispose();
 });
