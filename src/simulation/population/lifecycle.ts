@@ -20,7 +20,7 @@ export interface CountryPopulation {
 export type PopulationEvent =
   | { type: 'birth'; day: number; individualId: string; countryId: string }
   | { type: 'death'; day: number; individualId: string; countryId: string }
-  | { type: 'migration'; day: number; individualId: string; fromCountryId: string; toCountryId: string }
+  | { type: 'migration'; day: number; individualId: string; fromCountryId: string; toCountryId: string; toRegionId?: string | null }
   | { type: 'illness'; day: number; individualId: string; countryId: string }
   | { type: 'recovery'; day: number; individualId: string; countryId: string };
 
@@ -151,7 +151,7 @@ export function applyIndividualEvent(individual: Individual, event: PopulationEv
   }
   if (event.type === 'migration') {
     if (event.fromCountryId !== individual.countryId) throw new Error('Migration origin does not match current residence.');
-    return { ...individual, countryId: event.toCountryId };
+    return { ...individual, countryId: event.toCountryId, regionId: event.toRegionId ?? null };
   }
   if (event.countryId !== individual.countryId) throw new Error('Health event country does not match current residence.');
   if (event.type === 'illness') {
@@ -159,5 +159,5 @@ export function applyIndividualEvent(individual: Individual, event: PopulationEv
     return { ...individual, health: 'ill' };
   }
   if (individual.health !== 'ill') throw new Error('Only an ill individual can recover in this initial model.');
-  return { ...individual, health: 'recovering' };
+  return { ...individual, health: 'healthy' };
 }
