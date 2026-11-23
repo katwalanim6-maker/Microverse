@@ -153,6 +153,7 @@ let targetRotationX = 0.12;
 let cameraDistance = 5.3;
 
 renderer.domElement.addEventListener('pointerdown', (event) => {
+  if (event.button !== 0 && event.pointerType === 'mouse') return;
   dragging = true;
   previousX = event.clientX;
   previousY = event.clientY;
@@ -160,15 +161,24 @@ renderer.domElement.addEventListener('pointerdown', (event) => {
 });
 renderer.domElement.addEventListener('pointermove', (event) => {
   if (!dragging) return;
-  targetRotationY += (event.clientX - previousX) * 0.005;
-  targetRotationX += (event.clientY - previousY) * 0.003;
-  targetRotationX = THREE.MathUtils.clamp(targetRotationX, -1.1, 1.1);
+  const deltaX = event.clientX - previousX;
+  const deltaY = event.clientY - previousY;
+
+  // Higher sensitivity and quicker visual follow make the globe track the user's hand.
+  targetRotationY += deltaX * 0.009;
+  targetRotationX = THREE.MathUtils.clamp(
+    targetRotationX + deltaY * 0.006,
+    -1.1,
+    1.1
+  );
+
   previousX = event.clientX;
   previousY = event.clientY;
 });
 const stopDrag = () => { dragging = false; };
 renderer.domElement.addEventListener('pointerup', stopDrag);
 renderer.domElement.addEventListener('pointercancel', stopDrag);
+renderer.domElement.addEventListener('lostpointercapture', stopDrag);
 renderer.domElement.addEventListener('wheel', (event) => {
   event.preventDefault();
   cameraDistance = THREE.MathUtils.clamp(cameraDistance + event.deltaY * 0.004, 3.5, 8);
@@ -237,8 +247,10 @@ function animate(now: number): void {
     simulationMinutes += elapsed;
     renderClock();
   }
-  planetGroup.rotation.y += (targetRotationY - planetGroup.rotation.y) * 0.035;
-  planetGroup.rotation.x += (targetRotationX - planetGroup.rotation.x) * 0.035;
+  // Faster damping reduces the lag between pointer movement and globe rotation.
+  const rotationFollow = dragging ? 0.42 : 0.16;
+  planetGroup.rotation.y += (targetRotationY - planetGroup.rotation.y) * rotationFollow;
+  planetGroup.rotation.x += (targetRotationX - planetGroup.rotation.x) * rotationFollow;
   camera.position.z += (cameraDistance - camera.position.z) * 0.08;
   stars.rotation.y += 0.00004;
   renderer.render(scene, camera);
