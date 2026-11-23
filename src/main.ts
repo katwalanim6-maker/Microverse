@@ -29,14 +29,6 @@ const statusElement = statusNode;
 const worldPageElement = worldPageNode;
 const infoPageElement = infoPageNode;
 async function initializeWorld(): Promise<void> {
-function setActivePage(page: 'world' | 'info'): void {
-  worldPageElement.hidden = page !== 'world';
-  infoPageElement.hidden = page !== 'info';
-  pageButtons.forEach((button) => button.classList.toggle('active', button.dataset.page === page));
-  if (page === 'world') resize();
-}
-pageButtons.forEach((button) => button.addEventListener('click', () => setActivePage(button.dataset.page === 'info' ? 'info' : 'world')));
-backToWorldButton?.addEventListener('click', () => setActivePage('world'));
   // Give the browser two paint frames to display the loading screen before heavy work begins.
   await new Promise<void>((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve())));
   if (loadingNode) loadingNode.innerHTML = '<span class="loading-orb"></span><strong>GENERATING PLANET</strong><small>Creating land, oceans and 100 country territories...</small>';
@@ -619,6 +611,14 @@ function resize(): void {
 }
 const resizeObserver = new ResizeObserver(resize);
 resizeObserver.observe(mountElement);
+function setActivePage(page: 'world' | 'info'): void {
+  worldPageElement.hidden = page !== 'world';
+  infoPageElement.hidden = page !== 'info';
+  pageButtons.forEach((button) => button.classList.toggle('active', button.dataset.page === page));
+  if (page === 'world') resize();
+}
+pageButtons.forEach((button) => button.addEventListener('click', () => setActivePage(button.dataset.page === 'info' ? 'info' : 'world')));
+backToWorldButton?.addEventListener('click', () => setActivePage('world'));
 resize();
 
 const CLOCK_STORAGE_KEY = 'microverse-clock-v1';
