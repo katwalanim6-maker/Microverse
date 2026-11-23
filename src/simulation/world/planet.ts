@@ -14,6 +14,12 @@ export interface Country {
   color: string;
   population: number;
   landCells: number;
+  capital: string | null;
+  government: string;
+  currency: string;
+  economy: string;
+  foundedYear: number | null;
+  status: 'unsettled' | 'established';
 }
 
 export interface WorldCell {
@@ -241,7 +247,13 @@ export function generatePlanetWorld(seed = WORLD_SEED): PlanetWorld {
     name,
     color: COUNTRY_COLORS[index],
     population: INITIAL_POPULATION_PER_COUNTRY,
-    landCells: countryLandCounts[index]
+    landCells: countryLandCounts[index],
+    capital: null,
+    government: 'Not yet established',
+    currency: 'Not yet established',
+    economy: 'Not yet established',
+    foundedYear: null,
+    status: 'unsettled'
   }));
 
   // Allocate exactly one million people to each country, then distribute them across its land.
