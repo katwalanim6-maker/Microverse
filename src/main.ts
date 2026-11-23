@@ -185,7 +185,9 @@ function createPlanetTexture(worldData: PlanetWorld): THREE.CanvasTexture {
         image.data[offset + 3] = 255;
         continue;
       }
-      const base = biomeColors[cell.terrain === 'coast' ? 'coast' : cell.biome];
+      const base: [number, number, number] = cell.volcanic
+        ? [91, 76, 69]
+        : biomeColors[cell.terrain === 'coast' ? 'coast' : cell.biome];
       const tint = countryTints[cell.countryIndex];
       const slopeShade = Math.max(0.72, Math.min(1.28, 1 + (left.elevation - right.elevation) * 0.85 + (up.elevation - (down?.elevation ?? cell.elevation)) * 0.85));
       const altitudeShade = 0.84 + cell.elevation * 0.30;
