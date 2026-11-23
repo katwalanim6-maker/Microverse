@@ -11,7 +11,7 @@ The observer is the **World Architect**: able to inspect the world and establish
 | Dimension | Initial rule |
 |---|---|
 | World | Entirely fictional planet |
-| Initial population target | 1,000,000 individuals |
+| Initial population | 1,000,000 in each of 100 countries (100,000,000 total) |\n| Countries | 100 |\n| Land / ocean | 73% land, 27% ocean |
 | Starting history | Primitive settlements, Year 0 |
 | Time scale | 1 real second = 1 simulation minute |
 | Governance | Emerges locally; no mandatory global government |
@@ -26,7 +26,7 @@ Time conversion:
 
 The clock must support pause, resume, save/load and controlled speed changes. Elapsed simulation time must not be lost merely because a browser tab is backgrounded.
 
-## 3. Planet and environment
+## 3. Planet and environment\n\nThe initial atlas targets exactly 73% land cells and 27% ocean cells on its equirectangular world grid. The world begins with 100 countries, each assigned exactly 1,000,000 inhabitants (100,000,000 total). Country names and colours are generated from a fixed catalogue so identities remain stable for a given version.
 
 The planet contains continents, oceans, islands, mountains, rivers, plains, forests, deserts, climate zones, natural resources and ecosystems. Geography and resource distribution should influence where settlements emerge and what they can produce.
 
@@ -43,7 +43,7 @@ Every inhabitant is an individual, not merely a population counter. Each persist
 
 A person's future must not be hard-coded from their parents' profession or social position. A farmer's child may pursue any available ambition, subject to opportunity, learning and circumstance.
 
-### Scalable mind simulation
+### Life cycle and population change\n\nIndividuals are born into the world, age through life stages, can become ill and recover, and eventually die. Migration moves living individuals between regions and across country borders; migration updates both origin and destination population totals and records a migration event. Births, deaths, illness, recovery and migration are explicit historical events, not unexplained changes to a counter. Health outcomes depend on healthcare access, environment, age and other later-defined simulation factors. No individual is guaranteed a fixed lifespan.\n\n### Scalable mind simulation
 
 All inhabitants receive persistent identity and compact behavioral state. Scheduling is event-driven and priority-based: nearby, changing or socially important situations receive more computation, while quiet populations can be advanced through efficient aggregate rules. Detailed language-model reasoning is an optional tool for selected situations, not a per-person-per-tick requirement.
 
