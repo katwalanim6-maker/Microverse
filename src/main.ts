@@ -5,22 +5,34 @@ import './style.css';
 const mount = document.querySelector<HTMLDivElement>('#planet-canvas');
 const dateNode = document.querySelector<HTMLElement>('#world-date');
 const timeNode = document.querySelector<HTMLElement>('#world-time');
-const pauseButton = document.querySelector<HTMLButtonElement>('#pause-button');
 const statusNode = document.querySelector<HTMLElement>('#clock-status');
+const worldPageNode = document.querySelector<HTMLElement>('#world-page');
+const infoPageNode = document.querySelector<HTMLElement>('#info-page');
+const pageButtons = document.querySelectorAll<HTMLButtonElement>('[data-page]');
+const backToWorldButton = document.querySelector<HTMLButtonElement>('#back-to-world');
+const zoomLevelNode = document.querySelector<HTMLElement>('#zoom-level');
+const yearNode = document.querySelector<HTMLElement>('#world-year');
 const summaryNode = document.querySelector<HTMLElement>('#world-summary');
 const countryListNode = document.querySelector<HTMLElement>('#country-list');
 const countryDetailNode = document.querySelector<HTMLElement>('#country-detail');
 const countrySearchNode = document.querySelector<HTMLInputElement>('#country-search');
 
-if (!mount || !dateNode || !timeNode || !pauseButton || !statusNode) {
+if (!mount || !dateNode || !timeNode || !statusNode || !worldPageNode || !infoPageNode) {
   throw new Error('MICROVERSE could not initialize: required interface element is missing.');
 }
 
 const mountElement = mount;
 const dateElement = dateNode;
 const timeElement = timeNode;
-const pauseElement = pauseButton;
 const statusElement = statusNode;
+function setActivePage(page: 'world' | 'info'): void {
+  worldPageNode.hidden = page !== 'world';
+  infoPageNode.hidden = page !== 'info';
+  pageButtons.forEach((button) => button.classList.toggle('active', button.dataset.page === page));
+  if (page === 'world') resize();
+}
+pageButtons.forEach((button) => button.addEventListener('click', () => setActivePage(button.dataset.page === 'info' ? 'info' : 'world')));
+backToWorldButton?.addEventListener('click', () => setActivePage('world'));
 const world: PlanetWorld = generatePlanetWorld();
 if (summaryNode) summaryNode.textContent = getWorldSummary(world);
 
@@ -57,6 +69,7 @@ function showCountry(country: PlanetWorld['countries'][number]): void {
   countryListNode?.querySelectorAll<HTMLButtonElement>('.country-choice').forEach((button) => {
     button.classList.toggle('selected', button.dataset.countryId === country.id);
   });
+  setActivePage('info');
 }
 function renderCountryList(filter = ''): void {
   if (!countryListNode) return;
@@ -261,6 +274,8 @@ function selectCountryAtPointer(clientX: number, clientY: number): void {
     ((clientX - rect.left) / rect.width) * 2 - 1,
     -((clientY - rect.top) / rect.height) * 2 + 1
   );
+  planetGroup.updateMatrixWorld(true);
+  camera.updateMatrixWorld(true);
   const raycaster = new THREE.Raycaster();
   raycaster.setFromCamera(pointer, camera);
   const hit = raycaster.intersectObject(planet, false)[0];
@@ -268,7 +283,19 @@ function selectCountryAtPointer(clientX: number, clientY: number): void {
   if (!uv) return;
   const x = Math.min(world.width - 1, Math.max(0, Math.floor(uv.x * world.width)));
   const y = Math.min(world.height - 1, Math.max(0, Math.floor((1 - uv.y) * world.height)));
-  const cell = world.cells[y * world.width + x];
+  let cell = world.cells[y * world.width + x];
+  if (!cell || cell.countryIndex < 0) {
+    for (let radius = 1; radius <= 3 && (!cell || cell.countryIndex < 0); radius++) {
+      for (let dy = -radius; dy <= radius && (!cell || cell.countryIndex < 0); dy++) {
+        for (let dx = -radius; dx <= radius && (!cell || cell.countryIndex < 0); dx++) {
+          const candidateX = (x + dx + world.width) % world.width;
+          const candidateY = Math.min(world.height - 1, Math.max(0, y + dy));
+          const candidate = world.cells[candidateY * world.width + candidateX];
+          if (candidate.countryIndex >= 0) cell = candidate;
+        }
+      }
+    }
+  }
   if (cell && cell.countryIndex >= 0) showCountry(world.countries[cell.countryIndex]);
 }
 const stopDrag = (event: PointerEvent) => {
@@ -278,7 +305,6 @@ const stopDrag = (event: PointerEvent) => {
 };
 renderer.domElement.addEventListener('pointerup', stopDrag);
 renderer.domElement.addEventListener('pointercancel', () => { dragging = false; });
-renderer.domElement.addEventListener('lostpointercapture', stopDrag);
 renderer.domElement.addEventListener('wheel', (event) => {
   event.preventDefault();
   cameraDistance = THREE.MathUtils.clamp(cameraDistance + event.deltaY * 0.003, 2.15, 9.5);
@@ -297,7 +323,7 @@ renderer.domElement.addEventListener('touchmove', (event) => {
   const a = event.touches[0];
   const b = event.touches[1];
   const nextDistance = Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY);
-  cameraDistance = THREE.MathUtils.clamp(cameraDistance + (touchDistance - nextDistance) * 0.012, 3.5, 8);
+  cameraDistance = THREE.MathUtils.clamp(cameraDistance + (touchDistance - nextDistance) * 0.012, 2.15, 9.5);
   touchDistance = nextDistance;
 }, { passive: true });
 renderer.domElement.addEventListener('touchend', () => { touchDistance = 0; }, { passive: true });
@@ -313,9 +339,22 @@ const resizeObserver = new ResizeObserver(resize);
 resizeObserver.observe(mount);
 resize();
 
+const CLOCK_STORAGE_KEY = 'microverse-clock-v1';
+const nowAtStart = Date.now();
 let simulationMinutes = 0;
-let running = true;
-let lastClockUpdate = performance.now();
+let lastWallClockMs = nowAtStart;
+
+try {
+  const saved = localStorage.getItem(CLOCK_STORAGE_KEY);
+  if (saved) {
+    const parsed = JSON.parse(saved) as { version: number; seed: number; simulationMinutes: number; savedAt: number };
+    if (parsed.version === 1 && parsed.seed === world.seed && Number.isFinite(parsed.simulationMinutes) && Number.isFinite(parsed.savedAt)) {
+      simulationMinutes = parsed.simulationMinutes + Math.max(0, nowAtStart - parsed.savedAt) / 1000;
+    }
+  }
+} catch {
+  // A blocked or corrupt local save must never prevent the world from starting.
+}
 
 function renderClock(): void {
   const totalMinutes = Math.floor(simulationMinutes);
@@ -329,24 +368,45 @@ function renderClock(): void {
   const minutes = minuteOfDay % 60;
   dateElement.textContent = `DAY ${String(dayOfMonth).padStart(3, '0')} · MONTH ${String(month).padStart(2, '0')} · YEAR ${String(year).padStart(4, '0')}`;
   timeElement.textContent = `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`;
+  if (yearNode) yearNode.textContent = `YEAR ${String(year).padStart(4, '0')}`;
 }
 
-pauseElement.addEventListener('click', () => {
-  running = !running;
-  pauseElement.innerHTML = running ? 'Ⅱ <span>PAUSE WORLD</span>' : '▶ <span>RESUME WORLD</span>';
-  statusElement.textContent = running ? 'SIMULATION RUNNING' : 'SIMULATION PAUSED';
-  statusElement.classList.toggle('paused', !running);
-  lastClockUpdate = performance.now();
+function saveClock(): void {
+  try {
+    localStorage.setItem(CLOCK_STORAGE_KEY, JSON.stringify({
+      version: 1,
+      seed: world.seed,
+      simulationMinutes,
+      savedAt: Date.now()
+    }));
+  } catch {
+    // Storage may be unavailable in private or restricted browsing modes.
+  }
+}
+
+function catchUpWorldTime(): void {
+  const now = Date.now();
+  simulationMinutes += Math.max(0, now - lastWallClockMs) / 1000;
+  lastWallClockMs = now;
+  renderClock();
+  saveClock();
+}
+
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible') catchUpWorldTime();
+  else saveClock();
 });
+window.addEventListener('pagehide', saveClock);
+window.setInterval(saveClock, 5000);
 
 function animate(now: number): void {
   requestAnimationFrame(animate);
-  const elapsed = Math.min((now - lastClockUpdate) / 1000, 0.25);
-  lastClockUpdate = now;
-  if (running) {
-    simulationMinutes += elapsed;
-    renderClock();
-  }
+  const elapsedSeconds = Math.max(0, (Date.now() - lastWallClockMs) / 1000);
+  lastWallClockMs = Date.now();
+  simulationMinutes += elapsedSeconds;
+  renderClock();
+  const zoomLabel = cameraDistance < 3.1 ? 'LOCAL VIEW · SURFACE DETAIL' : cameraDistance < 4.7 ? 'REGIONAL VIEW · TERRAIN DETAIL' : cameraDistance < 6.5 ? 'CONTINENT VIEW · COUNTRY DETAIL' : 'PLANET VIEW · GLOBAL DETAIL';
+  if (zoomLevelNode && zoomLevelNode.textContent !== zoomLabel) zoomLevelNode.textContent = zoomLabel;
   // Faster damping reduces the lag between pointer movement and globe rotation.
   const rotationFollow = dragging ? 0.42 : 0.16;
   planetGroup.rotation.y += (targetRotationY - planetGroup.rotation.y) * rotationFollow;
@@ -356,6 +416,7 @@ function animate(now: number): void {
   renderer.render(scene, camera);
 }
 renderClock();
+saveClock();
 requestAnimationFrame(animate);
 
 window.addEventListener('beforeunload', () => {
