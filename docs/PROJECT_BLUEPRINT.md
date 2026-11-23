@@ -20,7 +20,7 @@ The observer is the **World Architect**: able to inspect the world and establish
 | Progression | No required technological or political path |
 | Observer | World Architect / observer |
 
-The current atlas uses a finite equirectangular grid. It selects whole grid cells using latitude-based spherical area weights, so the measured land percentage is a close grid-resolution approximation to 73%, not a claim of infinitely precise geometry. The displayed percentage is rounded to a whole percent.
+The current atlas uses a 1620 × 810 finite equirectangular grid (1,312,200 cells). It selects whole grid cells using latitude-based spherical area weights, so the measured land percentage is a close grid-resolution approximation to 73%, not a claim of infinitely precise geometry. The displayed percentage is rounded to a whole percent.
 
 Time conversion:
 - 1 simulation hour = 1 real minute.
