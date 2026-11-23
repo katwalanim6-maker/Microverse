@@ -6,19 +6,23 @@ MICROVERSE is a long-term simulation-engineering project: a living world with ge
 
 ## Current milestone: v0.1 — Planet Genesis
 
-This first application milestone establishes the browser-based 3D world shell:
+The current application establishes:
 - A procedural, fictional planet rendered in 3D.
+- 100 generated country territories.
+- A target of 73% land and 27% ocean, measured with latitude-based spherical cell weights at the current map resolution.
+- Exactly 1,000,000 starting inhabitants per country: 100,000,000 globally.
 - Camera rotation and zoom.
 - A simulation clock: **1 real second = 1 simulation minute**.
 - Pause/resume controls and a responsive observer interface.
-- A modular foundation for future simulation systems.
+- A first population lifecycle foundation for individual records and explicit demographic events.
 
-The globe is an initial visual prototype. It does **not** yet simulate the one million inhabitants, countries, economies, factories or transport networks. Those systems are planned milestones, not currently implemented features.
+The atlas and population ledger are foundations, not a fully running 100-million-person civilization. The project does not yet simulate every person's detailed mind, healthcare access, family, economy or daily decisions.
 
 ## World constitution
 
 - Fictional planet; history begins at primitive settlements in Year 0.
-- Initial population target: 1,000,000 simulated individuals.
+- 100 countries, each starting with 1,000,000 inhabitants.
+- Individuals can be born, age, become ill, recover, migrate and die through explicit simulation events.
 - Individuals should have distinct identities, personalities, needs, memories, relationships, beliefs and self-generated ambitions.
 - No mandatory civilization progression or predetermined life paths.
 - The world is observed and shaped through laws, policies and institutions rather than direct control of every individual.
@@ -29,7 +33,7 @@ The globe is an initial visual prototype. It does **not** yet simulate the one m
 ## Technology
 
 - TypeScript + Vite
-- Three.js for 3D rendering
+- Three.js for 3D
 - Browser-based application, designed responsively for phones
 - Railway for hosting; GitHub for source control
 
