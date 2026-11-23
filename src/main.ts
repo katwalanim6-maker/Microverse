@@ -16,6 +16,7 @@ const summaryNode = document.querySelector<HTMLElement>('#world-summary');
 const countryListNode = document.querySelector<HTMLElement>('#country-list');
 const countryDetailNode = document.querySelector<HTMLElement>('#country-detail');
 const countrySearchNode = document.querySelector<HTMLInputElement>('#country-search');
+const loadingNode = document.querySelector<HTMLElement>('#planet-loading');
 
 if (!mount || !dateNode || !timeNode || !statusNode || !worldPageNode || !infoPageNode) {
   throw new Error('MICROVERSE could not initialize: required interface element is missing.');
@@ -35,7 +36,11 @@ function setActivePage(page: 'world' | 'info'): void {
 }
 pageButtons.forEach((button) => button.addEventListener('click', () => setActivePage(button.dataset.page === 'info' ? 'info' : 'world')));
 backToWorldButton?.addEventListener('click', () => setActivePage('world'));
-const world: PlanetWorld = generatePlanetWorld();
+async function initializeWorld(): Promise<void> {
+  // Give the browser two paint frames to display the loading screen before heavy work begins.
+  await new Promise<void>((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve())));
+  if (loadingNode) loadingNode.innerHTML = '<span class="loading-orb"></span><strong>GENERATING PLANET</strong><small>Creating land, oceans and 100 country territories...</small>';
+  const world: PlanetWorld = generatePlanetWorld();
 if (summaryNode) summaryNode.textContent = getWorldSummary(world);
 
 function showCountry(country: PlanetWorld['countries'][number]): void {
@@ -716,6 +721,7 @@ function animate(now: number): void {
   moonLight.target.position.copy(earthPosition);
   starMaterial.opacity = 0.78;
   renderer.render(scene, camera);
+  loadingNode?.classList.add('is-hidden');
 }
 renderClock();
 saveClock();
@@ -729,4 +735,17 @@ window.addEventListener('beforeunload', () => {
   countryBorders.geometry.dispose();
   (countryBorders.material as THREE.Material).dispose();
   starGeometry.dispose();
+});
+}
+
+void initializeWorld().catch((error: unknown) => {
+  console.error('MICROVERSE startup failed:', error);
+  const message = error instanceof Error ? error.message : 'An unexpected startup error occurred.';
+  if (loadingNode) {
+    loadingNode.classList.remove('is-hidden');
+    loadingNode.innerHTML = '<span class="loading-error">!</span><strong>WORLD INITIALIZATION FAILED</strong><small></small>';
+    const detail = loadingNode.querySelector('small');
+    if (detail) detail.textContent = message;
+  }
+  if (statusElement) statusElement.textContent = 'WORLD STARTUP ERROR';
 });
