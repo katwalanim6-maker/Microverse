@@ -1,5 +1,8 @@
 export const WORLD_SEED = 4182026;
-export const INITIAL_POPULATION = 1_000_000;
+export const INITIAL_POPULATION_PER_COUNTRY = 1_000_000;
+export const COUNTRY_COUNT = 100;
+export const INITIAL_POPULATION = COUNTRY_COUNT * INITIAL_POPULATION_PER_COUNTRY;
+export const TARGET_LAND_PERCENT = 73;
 export const MAP_WIDTH = 360;
 export const MAP_HEIGHT = 180;
 
@@ -26,18 +29,15 @@ export interface PlanetWorld {
   cells: WorldCell[];
   countries: Country[];
   totalPopulation: number;
+  landPercent: number;
 }
 
-const COUNTRY_NAMES = [
-  'Aurelia', 'Veyra', 'Caldris', 'Orinth', 'Myrr', 'Solenne',
-  'Tavora', 'Eldara', 'Nym', 'Korvale', 'Ilyth', 'Bracken'
-];
-
-const COUNTRY_COLORS = [
-  '#a98a69', '#8b9b72', '#a47b72', '#789a91',
-  '#9b8eaf', '#b39b63', '#668d9e', '#a17d9a',
-  '#7d967d', '#b18a72', '#7f8eae', '#9b9b70'
-];
+const NAME_PREFIXES = ["Ael","Bel","Cor","Dra","Eri","Fal","Gal","Ith","Kor","Lun"];
+const NAME_SUFFIXES = ["ara","en","oria","eth","una","ovar","ira","yss","alon","eia"];
+const COUNTRY_NAMES = NAME_PREFIXES.flatMap((prefix) =>
+  NAME_SUFFIXES.map((suffix) => prefix + suffix)
+);
+const COUNTRY_COLORS = ["#9f5656","#5db176","#9b69bf","#b1a543","#639fab","#b96e96","#62ab49","#5751bd","#b48974","#50a586","#af57b7","#afc464","#567a9f","#b15d6e","#69bf70","#6e43b1","#ab9363","#6eb9b7","#ab4993","#82bd51","#747eb4","#a55b50","#57b77f","#a964c4","#9f9f56","#5d98b1","#bf698d","#50b143","#6f63ab","#b9916e","#49ab93","#bd51b8","#9fb474","#506fa5","#b7575f","#64c479","#7a569f","#b1a05d","#69b8bf","#b14387","#7bab63","#6e71b9","#ab6249","#51bd8d","#a974b4","#9aa550","#578fb7","#c4647f","#569f56","#765db1","#bf9b69","#43b1a5","#ab639f","#96b96e","#4962ab","#bd5751","#74b489","#8650a5","#b7af57","#64afc4","#9f567a","#6eb15d","#7069bf","#b16e43","#63ab94","#b76eb9","#91ab49","#5182bd","#b4747d","#50a55b","#8157b7","#c4a964","#569e9f","#b15d98","#8bbf69","#4350b1","#ab7063","#6eb991","#9549ab","#b8bd51","#749eb4","#a5506f","#5eb757","#7964c4","#9f7c56","#5db1a0","#bf69b6","#87b143","#637aab","#b96e71","#49ab64","#8d51bd","#b4aa74","#509aa5","#b7578e","#7fc464","#57569f","#b1765d","#69bf9c","#a543b1"];
 
 function seededRandom(seed: number): () => number {
   let value = seed >>> 0;
@@ -60,28 +60,16 @@ function smoothNoise(x: number, y: number, seed: number): number {
   };
   const sx = fade(fx);
   const sy = fade(fy);
-  const a = hash(ix, iy);
-  const b = hash(ix + 1, iy);
-  const c = hash(ix, iy + 1);
-  const d = hash(ix + 1, iy + 1);
-  const top = a + (b - a) * sx;
-  const bottom = c + (d - c) * sx;
+  const top = hash(ix, iy) + (hash(ix + 1, iy) - hash(ix, iy)) * sx;
+  const bottom = hash(ix, iy + 1) + (hash(ix + 1, iy + 1) - hash(ix, iy + 1)) * sx;
   return top + (bottom - top) * sy;
 }
 
 interface Landmass {
-  x: number;
-  y: number;
-  rx: number;
-  ry: number;
-  rotation: number;
-  strength: number;
+  x: number; y: number; rx: number; ry: number; rotation: number; strength: number;
 }
 
-interface CountrySeed {
-  x: number;
-  y: number;
-}
+interface CountrySeed { x: number; y: number; }
 
 function wrapDistanceX(a: number, b: number): number {
   const direct = Math.abs(a - b);
@@ -90,13 +78,12 @@ function wrapDistanceX(a: number, b: number): number {
 
 function generateLandmasses(rand: () => number): Landmass[] {
   const masses: Landmass[] = [];
-  const count = 9;
-  for (let i = 0; i < count; i++) {
+  for (let i = 0; i < 9; i++) {
     masses.push({
       x: rand() * MAP_WIDTH,
-      y: 24 + rand() * (MAP_HEIGHT - 48),
-      rx: 19 + rand() * 35,
-      ry: 12 + rand() * 25,
+      y: 18 + rand() * (MAP_HEIGHT - 36),
+      rx: 18 + rand() * 31,
+      ry: 11 + rand() * 22,
       rotation: (rand() - 0.5) * 1.2,
       strength: 0.78 + rand() * 0.22
     });
@@ -113,55 +100,77 @@ function landScore(x: number, y: number, masses: Landmass[], seed: number): numb
     const sin = Math.sin(mass.rotation);
     const rx = (dx * cos - dy * sin) / mass.rx;
     const ry = (dx * sin + dy * cos) / mass.ry;
-    const distance = Math.sqrt(rx * rx + ry * ry);
-    const influence = mass.strength - distance * 0.43;
+    const influence = mass.strength - Math.sqrt(rx * rx + ry * ry) * 0.43;
     continental = Math.max(continental, influence);
   }
-  const broad = smoothNoise(x / 30, y / 22, seed) - 0.5;
-  const detail = smoothNoise(x / 9, y / 8, seed + 91) - 0.5;
-  const fine = smoothNoise(x / 3.5, y / 3.5, seed + 177) - 0.5;
-  return continental + broad * 0.28 + detail * 0.12 + fine * 0.045;
+  return continental
+    + (smoothNoise(x / 30, y / 22, seed) - 0.5) * 0.28
+    + (smoothNoise(x / 9, y / 8, seed + 91) - 0.5) * 0.12
+    + (smoothNoise(x / 3.5, y / 3.5, seed + 177) - 0.5) * 0.045;
+}
+
+function selectCountrySeeds(landIndices: number[], rand: () => number): CountrySeed[] {
+  if (landIndices.length < COUNTRY_COUNT) {
+    throw new Error('The generated planet does not contain enough land for 100 countries.');
+  }
+  const seeds: number[] = [];
+  const first = Math.floor(rand() * landIndices.length);
+  seeds.push(landIndices[first]);
+
+  // Farthest-point sampling spreads country capitals across the available land.
+  const minDistances = new Float64Array(landIndices.length);
+  minDistances.fill(Number.POSITIVE_INFINITY);
+  while (seeds.length < COUNTRY_COUNT) {
+    const latest = seeds[seeds.length - 1];
+    const sx = latest % MAP_WIDTH;
+    const sy = Math.floor(latest / MAP_WIDTH);
+    let bestPosition = -1;
+    let bestDistance = -1;
+    for (let i = 0; i < landIndices.length; i++) {
+      const index = landIndices[i];
+      const dx = wrapDistanceX(index % MAP_WIDTH, sx);
+      const dy = Math.floor(index / MAP_WIDTH) - sy;
+      const distance = dx * dx + dy * dy;
+      if (distance < minDistances[i]) minDistances[i] = distance;
+      if (!seeds.includes(index) && minDistances[i] > bestDistance) {
+        bestDistance = minDistances[i];
+        bestPosition = i;
+      }
+    }
+    if (bestPosition < 0) throw new Error('Could not place 100 distinct country seeds.');
+    seeds.push(landIndices[bestPosition]);
+  }
+  return seeds.map((index) => ({ x: index % MAP_WIDTH, y: Math.floor(index / MAP_WIDTH) }));
 }
 
 export function generatePlanetWorld(seed = WORLD_SEED): PlanetWorld {
   const rand = seededRandom(seed);
   const masses = generateLandmasses(rand);
-  const rawLand = new Uint8Array(MAP_WIDTH * MAP_HEIGHT);
-  const elevation = new Float32Array(MAP_WIDTH * MAP_HEIGHT);
-  const countrySeeds: CountrySeed[] = [];
+  const scores = new Float32Array(MAP_WIDTH * MAP_HEIGHT);
+  const ranked: Array<{ index: number; score: number }> = [];
 
   for (let y = 0; y < MAP_HEIGHT; y++) {
     for (let x = 0; x < MAP_WIDTH; x++) {
       const index = y * MAP_WIDTH + x;
       const polarPenalty = Math.abs((y / MAP_HEIGHT) * 2 - 1) * 0.12;
       const score = landScore(x, y, masses, seed) - polarPenalty;
-      elevation[index] = score;
-      rawLand[index] = score > 0.015 ? 1 : 0;
+      scores[index] = score;
+      ranked.push({ index, score });
     }
   }
 
-  // Pick country centres from generated land so every country starts with territory.
-  for (let i = 0; i < COUNTRY_NAMES.length; i++) {
-    let chosen = -1;
-    for (let attempt = 0; attempt < 500; attempt++) {
-      const x = Math.floor(rand() * MAP_WIDTH);
-      const y = 12 + Math.floor(rand() * (MAP_HEIGHT - 24));
-      const index = y * MAP_WIDTH + x;
-      if (rawLand[index]) {
-        chosen = index;
-        break;
-      }
-    }
-    if (chosen < 0) {
-      chosen = Math.floor((MAP_HEIGHT / 2) * MAP_WIDTH + (i * MAP_WIDTH / COUNTRY_NAMES.length));
-    }
-    countrySeeds.push({ x: chosen % MAP_WIDTH, y: Math.floor(chosen / MAP_WIDTH) });
-  }
+  // Select exactly 73% of map cells as land; the remaining 27% are ocean.
+  const landCellCount = Math.round(ranked.length * TARGET_LAND_PERCENT / 100);
+  ranked.sort((a, b) => b.score - a.score);
+  const rawLand = new Uint8Array(ranked.length);
+  const landIndices = ranked.slice(0, landCellCount).map(({ index }) => index);
+  for (const index of landIndices) rawLand[index] = 1;
 
-  const cells: WorldCell[] = new Array(MAP_WIDTH * MAP_HEIGHT);
-  const countryLandCounts = new Array(COUNTRY_NAMES.length).fill(0) as number[];
-  const countryWeights = new Array(COUNTRY_NAMES.length).fill(0) as number[];
-  const cellWeights = new Float64Array(MAP_WIDTH * MAP_HEIGHT);
+  const countrySeeds = selectCountrySeeds(landIndices, rand);
+  const cells: WorldCell[] = new Array(ranked.length);
+  const countryLandCounts = new Array(COUNTRY_COUNT).fill(0) as number[];
+  const countryWeights = new Array(COUNTRY_COUNT).fill(0) as number[];
+  const cellWeights = new Float64Array(ranked.length);
 
   for (let y = 0; y < MAP_HEIGHT; y++) {
     for (let x = 0; x < MAP_WIDTH; x++) {
@@ -181,70 +190,59 @@ export function generatePlanetWorld(seed = WORLD_SEED): PlanetWorld {
           nearest = c;
         }
       }
-      const score = elevation[index];
-      const terrain: Terrain = score > 0.49 ? 'mountains' : score > 0.34 ? 'highlands' : 'plains';
+      const score = scores[index];
+      const baseTerrain: Terrain = score > 0.49 ? 'mountains' : score > 0.34 ? 'highlands' : 'plains';
       const left = y * MAP_WIDTH + (x === 0 ? MAP_WIDTH - 1 : x - 1);
       const right = y * MAP_WIDTH + (x === MAP_WIDTH - 1 ? 0 : x + 1);
       const up = y > 0 ? index - MAP_WIDTH : -1;
       const down = y < MAP_HEIGHT - 1 ? index + MAP_WIDTH : -1;
       const nearOcean = [left, right, up, down].some((neighbor) => neighbor >= 0 && !rawLand[neighbor]);
-      cells[index] = { terrain: nearOcean ? 'coast' : terrain, countryIndex: nearest, population: 0 };
+      cells[index] = { terrain: nearOcean ? 'coast' : baseTerrain, countryIndex: nearest, population: 0 };
       countryLandCounts[nearest]++;
       const latitudeFactor = 0.55 + (1 - Math.abs((y / MAP_HEIGHT) * 2 - 1)) * 0.45;
-      const terrainFactor = terrain === 'mountains' ? 0.28 : terrain === 'highlands' ? 0.72 : 1;
-      const coastFactor = nearOcean ? 1.25 : 1;
-      const weight = latitudeFactor * terrainFactor * coastFactor;
+      const terrainFactor = baseTerrain === 'mountains' ? 0.28 : baseTerrain === 'highlands' ? 0.72 : 1;
+      const weight = latitudeFactor * terrainFactor * (nearOcean ? 1.25 : 1);
       cellWeights[index] = weight;
       countryWeights[nearest] += weight;
     }
   }
 
-  const totalWeight = countryWeights.reduce((sum, value) => sum + value, 0);
-  const populations = countryWeights.map((weight) => Math.floor(INITIAL_POPULATION * weight / totalWeight));
-  let remainder = INITIAL_POPULATION - populations.reduce((sum, value) => sum + value, 0);
-  const remainderOrder = countryWeights
-    .map((weight, index) => ({ index, fraction: INITIAL_POPULATION * weight / totalWeight - populations[index] }))
-    .sort((a, b) => b.fraction - a.fraction);
-  for (let i = 0; i < remainder; i++) populations[remainderOrder[i].index]++;
-
-  const countries = COUNTRY_NAMES.map((name, index): Country => ({
-    id: `country-${String(index + 1).padStart(2, '0')}`,
+  const countries: Country[] = COUNTRY_NAMES.map((name, index) => ({
+    id: `country-${String(index + 1).padStart(3, '0')}`,
     name,
     color: COUNTRY_COLORS[index],
-    population: populations[index],
+    population: INITIAL_POPULATION_PER_COUNTRY,
     landCells: countryLandCounts[index]
   }));
 
-  // Distribute each country's people over its land cells using the same deterministic weights.
-  const countryAssigned = new Array(COUNTRY_NAMES.length).fill(0) as number[];
+  // Allocate exactly one million people to each country, then distribute them across its land.
+  const countryAssigned = new Array(COUNTRY_COUNT).fill(0) as number[];
   for (let index = 0; index < cells.length; index++) {
     const cell = cells[index];
     if (cell.countryIndex < 0) continue;
-    const weight = cellWeights[index];
-    const country = countries[cell.countryIndex];
-    const allocation = Math.floor(country.population * weight / countryWeights[cell.countryIndex]);
+    const countryIndex = cell.countryIndex;
+    const weightTotal = countryWeights[countryIndex];
+    if (weightTotal <= 0) throw new Error(`Country ${countryIndex + 1} has no territory.`);
+    const allocation = Math.floor(INITIAL_POPULATION_PER_COUNTRY * cellWeights[index] / weightTotal);
     cell.population = allocation;
-    countryAssigned[cell.countryIndex] += allocation;
+    countryAssigned[countryIndex] += allocation;
   }
-  // Put rounding remainder into the first land cell belonging to each country.
   for (let c = 0; c < countries.length; c++) {
     const extra = countries[c].population - countryAssigned[c];
-    if (extra <= 0) continue;
     const firstCell = cells.find((cell) => cell.countryIndex === c);
-    if (firstCell) firstCell.population += extra;
+    if (!firstCell) throw new Error(`Country ${c + 1} has no land cells.`);
+    firstCell.population += extra;
   }
 
-  return {
-    seed,
-    width: MAP_WIDTH,
-    height: MAP_HEIGHT,
-    cells,
-    countries,
-    totalPopulation: countries.reduce((sum, country) => sum + country.population, 0)
-  };
+  const landPercent = landCellCount / cells.length * 100;
+  const totalPopulation = countries.reduce((sum, country) => sum + country.population, 0);
+  if (countries.length !== COUNTRY_COUNT || totalPopulation !== INITIAL_POPULATION) {
+    throw new Error('World generation failed its country-count or population invariant.');
+  }
+
+  return { seed, width: MAP_WIDTH, height: MAP_HEIGHT, cells, countries, totalPopulation, landPercent };
 }
 
 export function getWorldSummary(world: PlanetWorld): string {
-  const land = world.cells.filter((cell) => cell.countryIndex >= 0).length;
-  return `${world.countries.length} COUNTRIES · ${world.totalPopulation.toLocaleString('en-US')} INHABITANTS · ${Math.round(land / world.cells.length * 100)}% LAND`;
+  return `${world.countries.length} COUNTRIES · ${world.totalPopulation.toLocaleString('en-US')} INHABITANTS · ${world.landPercent.toFixed(0)}% LAND`;
 }
