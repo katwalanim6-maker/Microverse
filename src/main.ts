@@ -40,13 +40,7 @@ if (summaryNode) summaryNode.textContent = getWorldSummary(world);
 
 function showCountry(country: PlanetWorld['countries'][number]): void {
   if (!countryDetailNode) return;
-  const countryCells = world.cells.filter((cell) => cell.countryIndex === world.countries.indexOf(country));
-  const terrainCount = { plains: 0, highlands: 0, mountains: 0, coast: 0 };
-  for (const cell of countryCells) {
-    if (cell.terrain in terrainCount) terrainCount[cell.terrain as keyof typeof terrainCount]++;
-  }
   const landShare = country.geography.surfaceAreaPercent;
-  const density = country.landCells > 0 ? country.population / country.landCells : 0;
   countryDetailNode.innerHTML = `
     <div class="country-title-row"><span class="country-swatch" style="--country-color:${country.color}"></span><div><p class="eyebrow">COUNTRY PROFILE // ${country.id.toUpperCase()}</p><h3>${country.name}</h3><span class="country-status">FOUNDATION STATUS: ${country.status.toUpperCase()}</span></div></div>
     <div class="country-stat-grid">
