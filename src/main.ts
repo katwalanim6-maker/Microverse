@@ -119,6 +119,9 @@ const keyLight = new THREE.DirectionalLight(0xffe2c2, 2.8);
 scene.add(keyLight);
 const moonLight = new THREE.DirectionalLight(0x9eb8ff, 0.22);
 scene.add(moonLight);
+// DirectionalLight targets must belong to the scene for world-space aiming.
+scene.add(keyLight.target);
+scene.add(moonLight.target);
 
 const rimLight = new THREE.PointLight(0x6e68ff, 12, 14);
 rimLight.position.set(3, -1, -3);
