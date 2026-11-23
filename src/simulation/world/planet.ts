@@ -114,8 +114,10 @@ function selectCountrySeeds(landIndices: number[], rand: () => number): CountryS
     throw new Error('The generated planet does not contain enough land for 100 countries.');
   }
   const seeds: number[] = [];
+  const selected = new Uint8Array(MAP_WIDTH * MAP_HEIGHT);
   const first = Math.floor(rand() * landIndices.length);
   seeds.push(landIndices[first]);
+  selected[landIndices[first]] = 1;
 
   // Farthest-point sampling spreads country capitals across the available land.
   const minDistances = new Float64Array(landIndices.length);
@@ -132,13 +134,14 @@ function selectCountrySeeds(landIndices: number[], rand: () => number): CountryS
       const dy = Math.floor(index / MAP_WIDTH) - sy;
       const distance = dx * dx + dy * dy;
       if (distance < minDistances[i]) minDistances[i] = distance;
-      if (!seeds.includes(index) && minDistances[i] > bestDistance) {
+      if (!selected[index] && minDistances[i] > bestDistance) {
         bestDistance = minDistances[i];
         bestPosition = i;
       }
     }
     if (bestPosition < 0) throw new Error('Could not place 100 distinct country seeds.');
     seeds.push(landIndices[bestPosition]);
+    selected[landIndices[bestPosition]] = 1;
   }
   return seeds.map((index) => ({ x: index % MAP_WIDTH, y: Math.floor(index / MAP_WIDTH) }));
 }
@@ -147,7 +150,8 @@ export function generatePlanetWorld(seed = WORLD_SEED): PlanetWorld {
   const rand = seededRandom(seed);
   const masses = generateLandmasses(rand);
   const scores = new Float32Array(MAP_WIDTH * MAP_HEIGHT);
-  const ranked: Array<{ index: number; score: number }> = [];
+  const ranked: Array<{ index: number; score: number; surfaceWeight: number }> = [];
+  let totalSurfaceWeight = 0;
 
   for (let y = 0; y < MAP_HEIGHT; y++) {
     for (let x = 0; x < MAP_WIDTH; x++) {
@@ -155,16 +159,25 @@ export function generatePlanetWorld(seed = WORLD_SEED): PlanetWorld {
       const polarPenalty = Math.abs((y / MAP_HEIGHT) * 2 - 1) * 0.12;
       const score = landScore(x, y, masses, seed) - polarPenalty;
       scores[index] = score;
-      ranked.push({ index, score });
+      const latitudeRadians = ((0.5 - y / MAP_HEIGHT) * Math.PI);
+      const surfaceWeight = Math.cos(latitudeRadians);
+      totalSurfaceWeight += surfaceWeight;
+      ranked.push({ index, score, surfaceWeight });
     }
   }
 
-  // Select exactly 73% of map cells as land; the remaining 27% are ocean.
-  const landCellCount = Math.round(ranked.length * TARGET_LAND_PERCENT / 100);
+  // Select land by spherical cell area, not raw pixel count, so the planet's surface is 73% land.
   ranked.sort((a, b) => b.score - a.score);
   const rawLand = new Uint8Array(ranked.length);
-  const landIndices = ranked.slice(0, landCellCount).map(({ index }) => index);
-  for (const index of landIndices) rawLand[index] = 1;
+  const targetSurfaceWeight = totalSurfaceWeight * TARGET_LAND_PERCENT / 100;
+  const landIndices: number[] = [];
+  let selectedSurfaceWeight = 0;
+  for (const cell of ranked) {
+    if (selectedSurfaceWeight >= targetSurfaceWeight) break;
+    rawLand[cell.index] = 1;
+    landIndices.push(cell.index);
+    selectedSurfaceWeight += cell.surfaceWeight;
+  }
 
   const countrySeeds = selectCountrySeeds(landIndices, rand);
   const cells: WorldCell[] = new Array(ranked.length);
@@ -234,7 +247,7 @@ export function generatePlanetWorld(seed = WORLD_SEED): PlanetWorld {
     firstCell.population += extra;
   }
 
-  const landPercent = landCellCount / cells.length * 100;
+  const landPercent = selectedSurfaceWeight / totalSurfaceWeight * 100;
   const totalPopulation = countries.reduce((sum, country) => sum + country.population, 0);
   if (countries.length !== COUNTRY_COUNT || totalPopulation !== INITIAL_POPULATION) {
     throw new Error('World generation failed its country-count or population invariant.');
