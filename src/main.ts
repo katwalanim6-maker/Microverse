@@ -673,8 +673,9 @@ function animate(now: number): void {
   camera.lookAt(0, 0, 0);
 
   const dayAngle = (simulationMinutes / 1440) * Math.PI * 2;
-  const sunPosition = new THREE.Vector3(-8, 3.5, 10);
-  const moonPosition = new THREE.Vector3(7, 2.5, 10);
+  // Keep both bodies inside the narrow portrait camera view, above the horizon.
+  const sunPosition = new THREE.Vector3(-1.15, 3.15, 11);
+  const moonPosition = new THREE.Vector3(1.15, 3.15, 11);
   sun.position.copy(sunPosition);
   keyLight.position.copy(sunPosition);
   moon.position.copy(moonPosition);
