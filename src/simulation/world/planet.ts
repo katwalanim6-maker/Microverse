@@ -214,8 +214,11 @@ function selectCountrySeeds(landIndices: number[], rand: () => number): CountryS
   seeds.push(landIndices[first]);
   selected[landIndices[first]] = 1;
 
-  // Farthest-point sampling spreads country capitals across the available land.
-  const minDistances = new Float64Array(landIndices.length);
+  // Sample one candidate in every eight land cells to reduce repeated full-grid scans.
+  const candidates: number[] = [];
+  for (let i = 0; i < landIndices.length; i += 8) candidates.push(landIndices[i]);
+  if (candidates[candidates.length - 1] !== landIndices[landIndices.length - 1]) candidates.push(landIndices[landIndices.length - 1]);
+  const minDistances = new Float64Array(candidates.length);
   minDistances.fill(Number.POSITIVE_INFINITY);
   while (seeds.length < COUNTRY_COUNT) {
     const latest = seeds[seeds.length - 1];
@@ -223,20 +226,17 @@ function selectCountrySeeds(landIndices: number[], rand: () => number): CountryS
     const sy = Math.floor(latest / MAP_WIDTH);
     let bestPosition = -1;
     let bestDistance = -1;
-    for (let i = 0; i < landIndices.length; i++) {
-      const index = landIndices[i];
+    for (let i = 0; i < candidates.length; i++) {
+      const index = candidates[i];
       const dx = wrapDistanceX(index % MAP_WIDTH, sx);
       const dy = Math.floor(index / MAP_WIDTH) - sy;
       const distance = dx * dx + dy * dy;
       if (distance < minDistances[i]) minDistances[i] = distance;
-      if (!selected[index] && minDistances[i] > bestDistance) {
-        bestDistance = minDistances[i];
-        bestPosition = i;
-      }
+      if (!selected[index] && minDistances[i] > bestDistance) { bestDistance = minDistances[i]; bestPosition = i; }
     }
     if (bestPosition < 0) throw new Error('Could not place 100 distinct country seeds.');
-    seeds.push(landIndices[bestPosition]);
-    selected[landIndices[bestPosition]] = 1;
+    seeds.push(candidates[bestPosition]);
+    selected[candidates[bestPosition]] = 1;
   }
   return seeds.map((index) => ({ x: index % MAP_WIDTH, y: Math.floor(index / MAP_WIDTH) }));
 }
@@ -304,6 +304,34 @@ export function generatePlanetWorld(seed = WORLD_SEED): PlanetWorld {
   const countrySurfaceWeights = new Array(COUNTRY_COUNT).fill(0) as number[];
   const landThreshold = scores[landIndices[landIndices.length - 1]];
   const cellWeights = new Float64Array(orderKeys.length);
+  // Multi-source BFS assigns every map cell once instead of checking 100 seeds per land cell.
+  const countryOwners = new Int16Array(orderKeys.length);
+  countryOwners.fill(-1);
+  const ownerQueue = new Int32Array(orderKeys.length);
+  let queueHead = 0;
+  let queueTail = 0;
+  for (let country = 0; country < countrySeeds.length; country++) {
+    const seedIndex = countrySeeds[country].y * MAP_WIDTH + countrySeeds[country].x;
+    countryOwners[seedIndex] = country;
+    ownerQueue[queueTail++] = seedIndex;
+  }
+  while (queueHead < queueTail) {
+    const index = ownerQueue[queueHead++];
+    const owner = countryOwners[index];
+    const x = index % MAP_WIDTH;
+    const y = Math.floor(index / MAP_WIDTH);
+    const neighbors = [y * MAP_WIDTH + (x === 0 ? MAP_WIDTH - 1 : x - 1), y * MAP_WIDTH + (x + 1 === MAP_WIDTH ? 0 : x + 1), y > 0 ? index - MAP_WIDTH : -1, y + 1 < MAP_HEIGHT ? index + MAP_WIDTH : -1];
+    for (const neighbor of neighbors) {
+      if (neighbor >= 0 && countryOwners[neighbor] < 0) {
+        countryOwners[neighbor] = owner;
+        ownerQueue[queueTail++] = neighbor;
+      }
+    }
+  }
+  const riverSources = new Int32Array(COUNTRY_COUNT);
+  riverSources.fill(-1);
+  const riverSourceHeights = new Float32Array(COUNTRY_COUNT);
+  riverSourceHeights.fill(0.34);
 
   for (let y = 0; y < MAP_HEIGHT; y++) {
     for (let x = 0; x < MAP_WIDTH; x++) {
@@ -312,17 +340,7 @@ export function generatePlanetWorld(seed = WORLD_SEED): PlanetWorld {
         cells[index] = { terrain: 'ocean', countryIndex: -1, population: 0, elevation: 0, moisture: 0, temperature: 0, biome: 'ocean', river: false, tectonicActivity: 0, volcanic: false };
         continue;
       }
-      let nearest = 0;
-      let nearestDistance = Number.POSITIVE_INFINITY;
-      for (let c = 0; c < countrySeeds.length; c++) {
-        const dx = wrapDistanceX(x, countrySeeds[c].x);
-        const dy = y - countrySeeds[c].y;
-        const distance = dx * dx + dy * dy;
-        if (distance < nearestDistance) {
-          nearestDistance = distance;
-          nearest = c;
-        }
-      }
+      const nearest = countryOwners[index];
       const score = scores[index];
       const broadRelief = smoothNoise(x / 75, y / 57, seed + 201);
       const ridgeNoise = 1 - Math.abs(smoothNoise(x / 24, y / 21, seed + 207) * 2 - 1);
@@ -356,6 +374,10 @@ export function generatePlanetWorld(seed = WORLD_SEED): PlanetWorld {
         elevation: relativeElevation, moisture, temperature, biome, river: false,
         tectonicActivity: tectonics.activity, volcanic: tectonics.volcanic
       };
+      if (terrain !== 'coast' && relativeElevation > riverSourceHeights[nearest]) {
+        riverSourceHeights[nearest] = relativeElevation;
+        riverSources[nearest] = index;
+      }
       countryLandCounts[nearest]++;
       const latitudeFactor = 0.55 + latitude * 0.45;
       const terrainFactor = baseTerrain === 'mountains' ? 0.28 : baseTerrain === 'highlands' ? 0.72 : 1;
@@ -369,15 +391,7 @@ export function generatePlanetWorld(seed = WORLD_SEED): PlanetWorld {
   // Trace a natural drainage path from each country's highest interior point.
   // Rivers follow downhill cells and terminate at the coast or ocean.
   for (let countryIndex = 0; countryIndex < COUNTRY_COUNT; countryIndex++) {
-    let source = -1;
-    let highest = 0.34;
-    for (let index = 0; index < cells.length; index++) {
-      const cell = cells[index];
-      if (cell.countryIndex === countryIndex && cell.terrain !== 'coast' && cell.elevation > highest) {
-        highest = cell.elevation;
-        source = index;
-      }
-    }
+    const source = riverSources[countryIndex];
     if (source < 0) continue;
     let current = source;
     const visited = new Set<number>();
@@ -454,10 +468,13 @@ export function generatePlanetWorld(seed = WORLD_SEED): PlanetWorld {
 
   // Allocate exactly one million people to each country, then distribute them across its land.
   const countryAssigned = new Array(COUNTRY_COUNT).fill(0) as number[];
+  const firstCellIndices = new Int32Array(COUNTRY_COUNT);
+  firstCellIndices.fill(-1);
   for (let index = 0; index < cells.length; index++) {
     const cell = cells[index];
     if (cell.countryIndex < 0) continue;
     const countryIndex = cell.countryIndex;
+    if (firstCellIndices[countryIndex] < 0) firstCellIndices[countryIndex] = index;
     const weightTotal = countryWeights[countryIndex];
     if (weightTotal <= 0) throw new Error(`Country ${countryIndex + 1} has no territory.`);
     const allocation = Math.floor(INITIAL_POPULATION_PER_COUNTRY * cellWeights[index] / weightTotal);
@@ -466,9 +483,9 @@ export function generatePlanetWorld(seed = WORLD_SEED): PlanetWorld {
   }
   for (let c = 0; c < countries.length; c++) {
     const extra = countries[c].population - countryAssigned[c];
-    const firstCell = cells.find((cell) => cell.countryIndex === c);
-    if (!firstCell) throw new Error(`Country ${c + 1} has no land cells.`);
-    firstCell.population += extra;
+    const firstCellIndex = firstCellIndices[c];
+    if (firstCellIndex < 0) throw new Error(`Country ${c + 1} has no land cells.`);
+    cells[firstCellIndex].population += extra;
   }
 
   const landPercent = selectedSurfaceWeight / totalSurfaceWeight * 100;
