@@ -103,6 +103,9 @@ scene.background = new THREE.Color('#080a12');
 // Wide framing shows the Sun, Earth and Moon together at the starting zoom.
 const camera = new THREE.PerspectiveCamera(62, 1, 0.1, 120);
 camera.position.set(0, 0, 17.5);
+// The observer camera orbits Earth; dragging never rotates the planet or celestial bodies.
+let cameraAzimuth = 0;
+let cameraPolar = Math.PI / 2;
 
 const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false });
 renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.5));
@@ -478,8 +481,6 @@ moon.add(moonHalo);
 
 const activePointers = new Map<number, { x: number; y: number }>();
 const pointerStarts = new Map<number, { x: number; y: number }>();
-let dragging = false;
-let pinchZoomActive = false;
 let pinchDistance = 0;
 let clickCandidate = false;
 let cameraDistance = 17.5;
@@ -496,13 +497,10 @@ renderer.domElement.addEventListener('pointerdown', (event) => {
   activePointers.set(event.pointerId, { x: event.clientX, y: event.clientY });
   pointerStarts.set(event.pointerId, { x: event.clientX, y: event.clientY });
   if (activePointers.size === 1) {
-    dragging = true;
     clickCandidate = true;
   } else {
-    // A multi-touch gesture is exclusively a zoom gesture, never a rotation gesture.
-    dragging = false;
+    // A multi-touch gesture is exclusively a zoom gesture, never a camera orbit gesture.
     clickCandidate = false;
-    pinchZoomActive = true;
     pinchDistance = distanceBetweenPointers();
   }
 });
@@ -533,12 +531,15 @@ renderer.domElement.addEventListener('pointermove', (event) => {
     clickCandidate = false;
   }
 
-  // Smaller angular movement per screen pixel, with an additional reduction
-  // when zoomed in so close-up navigation remains controlled.
-  const zoomSensitivity = THREE.MathUtils.clamp(cameraDistance / 4.65, 0.38, 1);
-  const rotationSensitivity = 0.0042 * zoomSensitivity;
-  planetGroup.rotation.y += deltaX * rotationSensitivity;
-  planetGroup.rotation.x += deltaY * rotationSensitivity;
+  // Dragging moves the observer around Earth. The planet, Sun, Moon and stars
+  // remain in their own world-space coordinate systems.
+  const orbitSensitivity = 0.0052;
+  cameraAzimuth -= deltaX * orbitSensitivity;
+  cameraPolar = THREE.MathUtils.clamp(
+    cameraPolar + deltaY * orbitSensitivity,
+    0.12,
+    Math.PI - 0.12
+  );
 });
 
 function selectCountryAtPointer(clientX: number, clientY: number): void {
@@ -582,8 +583,6 @@ function finishPointer(event: PointerEvent): void {
   pointerStarts.delete(event.pointerId);
 
   if (activePointers.size === 0) {
-    dragging = false;
-    pinchZoomActive = false;
     pinchDistance = 0;
     if (wasSinglePointerClick) selectCountryAtPointer(event.clientX, event.clientY);
   } else if (activePointers.size === 1) {
@@ -591,8 +590,6 @@ function finishPointer(event: PointerEvent): void {
     const remaining = [...activePointers.entries()][0];
     activePointers.set(remaining[0], { ...remaining[1] });
     pointerStarts.set(remaining[0], { ...remaining[1] });
-    dragging = true;
-    pinchZoomActive = false;
     pinchDistance = 0;
     clickCandidate = false;
   } else {
@@ -696,16 +693,17 @@ function animate(now: number): void {
   moonOrbit.rotation.y = monthAngle;
   planetSpin.rotation.y = dayAngle;
 
-  // The camera follows Earth's centre so the world remains comfortably framed,
-  // while the Sun and Moon move naturally through the sky relative to the observer.
+  // Keep Earth as the viewing target while orbiting the camera around it.
+  // Sun, Moon and stars remain fixed in world space (apart from their own orbits).
   earthOrbit.updateMatrixWorld(true);
   const earthPosition = planetGroup.getWorldPosition(new THREE.Vector3());
   const moonPosition = moon.getWorldPosition(new THREE.Vector3());
-  camera.position.set(
-    earthPosition.x,
-    earthPosition.y,
-    earthPosition.z + cameraDistance
+  const cameraOffset = new THREE.Vector3(
+    cameraDistance * Math.sin(cameraPolar) * Math.sin(cameraAzimuth),
+    cameraDistance * Math.cos(cameraPolar),
+    cameraDistance * Math.sin(cameraPolar) * Math.cos(cameraAzimuth)
   );
+  camera.position.copy(earthPosition).add(cameraOffset);
   camera.lookAt(earthPosition);
 
   // Directional sunlight comes from the actual fixed Sun position and points
