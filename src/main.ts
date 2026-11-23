@@ -248,7 +248,8 @@ function createPlanetTexture(worldData: PlanetWorld): THREE.CanvasTexture {
 const earthOrbit = new THREE.Group();
 scene.add(earthOrbit);
 
-const earthOrbitRadius = 3.5;
+// Slightly wider system spacing keeps the Sun clearly separated from Earth.
+const earthOrbitRadius = 4.4;
 const planetGroup = new THREE.Group();
 planetGroup.position.set(earthOrbitRadius, 0, 0);
 earthOrbit.add(planetGroup);
@@ -471,7 +472,8 @@ const moon = new THREE.Mesh(
   new THREE.SphereGeometry(0.25, 32, 24),
   new THREE.MeshStandardMaterial({ color: 0xcbd5e8, roughness: 0.9, metalness: 0.02, emissive: 0x202b45 })
 );
-moon.position.set(2.35, 0, 0);
+// The Moon remains closer than the Sun, but has a more readable orbital gap.
+moon.position.set(2.7, 0, 0);
 moonOrbit.add(moon);
 const moonHalo = new THREE.Mesh(
   new THREE.SphereGeometry(0.38, 20, 16),
@@ -535,11 +537,9 @@ renderer.domElement.addEventListener('pointermove', (event) => {
   // remain in their own world-space coordinate systems.
   const orbitSensitivity = 0.0052;
   cameraAzimuth -= deltaX * orbitSensitivity;
-  cameraPolar = THREE.MathUtils.clamp(
-    cameraPolar + deltaY * orbitSensitivity,
-    0.12,
-    Math.PI - 0.12
-  );
+  // Allow continuous vertical orbit through both poles for a full 360° observer orbit.
+  // The spherical camera offset remains continuous as polar crosses 0 and PI.
+  cameraPolar += deltaY * orbitSensitivity;
 });
 
 function selectCountryAtPointer(clientX: number, clientY: number): void {
