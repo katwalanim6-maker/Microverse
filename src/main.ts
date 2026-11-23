@@ -28,6 +28,7 @@ const timeElement = timeNode;
 const statusElement = statusNode;
 const worldPageElement = worldPageNode;
 const infoPageElement = infoPageNode;
+async function initializeWorld(): Promise<void> {
 function setActivePage(page: 'world' | 'info'): void {
   worldPageElement.hidden = page !== 'world';
   infoPageElement.hidden = page !== 'info';
@@ -36,7 +37,6 @@ function setActivePage(page: 'world' | 'info'): void {
 }
 pageButtons.forEach((button) => button.addEventListener('click', () => setActivePage(button.dataset.page === 'info' ? 'info' : 'world')));
 backToWorldButton?.addEventListener('click', () => setActivePage('world'));
-async function initializeWorld(): Promise<void> {
   // Give the browser two paint frames to display the loading screen before heavy work begins.
   await new Promise<void>((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve())));
   if (loadingNode) loadingNode.innerHTML = '<span class="loading-orb"></span><strong>GENERATING PLANET</strong><small>Creating land, oceans and 100 country territories...</small>';
