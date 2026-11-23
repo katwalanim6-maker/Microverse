@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { generatePlanetWorld, getWorldSummary, type PlanetWorld } from './simulation/world/planet';
 import './style.css';
 
 const mount = document.querySelector<HTMLDivElement>('#planet-canvas');
@@ -6,6 +7,7 @@ const dateNode = document.querySelector<HTMLElement>('#world-date');
 const timeNode = document.querySelector<HTMLElement>('#world-time');
 const pauseButton = document.querySelector<HTMLButtonElement>('#pause-button');
 const statusNode = document.querySelector<HTMLElement>('#clock-status');
+const summaryNode = document.querySelector<HTMLElement>('#world-summary');
 
 if (!mount || !dateNode || !timeNode || !pauseButton || !statusNode) {
   throw new Error('MICROVERSE could not initialize: required interface element is missing.');
@@ -16,6 +18,8 @@ const dateElement = dateNode;
 const timeElement = timeNode;
 const pauseElement = pauseButton;
 const statusElement = statusNode;
+const world: PlanetWorld = generatePlanetWorld();
+if (summaryNode) summaryNode.textContent = getWorldSummary(world);
 
 const scene = new THREE.Scene();
 scene.background = new THREE.Color('#080a12');
@@ -49,46 +53,65 @@ function random(seed: number): () => number {
   };
 }
 
-function createPlanetTexture(): THREE.CanvasTexture {
+function createPlanetTexture(worldData: PlanetWorld): THREE.CanvasTexture {
   const canvas = document.createElement('canvas');
   canvas.width = 2048;
   canvas.height = 1024;
   const context = canvas.getContext('2d');
   if (!context) throw new Error('Canvas texture is unavailable.');
 
-  const rand = random(4182026);
-  const gradient = context.createLinearGradient(0, 0, 0, canvas.height);
-  gradient.addColorStop(0, '#172b43');
-  gradient.addColorStop(0.48, '#174c55');
-  gradient.addColorStop(1, '#10283d');
-  context.fillStyle = gradient;
-  context.fillRect(0, 0, canvas.width, canvas.height);
+  const mapCanvas = document.createElement('canvas');
+  mapCanvas.width = worldData.width;
+  mapCanvas.height = worldData.height;
+  const mapContext = mapCanvas.getContext('2d');
+  if (!mapContext) throw new Error('Geography map is unavailable.');
 
-  // Seeded, irregular landmasses: deliberately fictional rather than Earth geography.
-  const landColors = ['#71866d', '#879071', '#9b936f', '#687e72'];
-  for (let i = 0; i < 34; i++) {
-    const cx = rand() * canvas.width;
-    const cy = 100 + rand() * (canvas.height - 200);
-    const rx = 35 + rand() * 190;
-    const ry = 18 + rand() * 105;
-    context.beginPath();
-    for (let p = 0; p <= 48; p++) {
-      const angle = (p / 48) * Math.PI * 2;
-      const wobble = 0.72 + rand() * 0.52;
-      const x = cx + Math.cos(angle) * rx * wobble;
-      const y = cy + Math.sin(angle) * ry * wobble;
-      if (p === 0) context.moveTo(x, y);
-      else context.lineTo(x, y);
+  const image = mapContext.createImageData(worldData.width, worldData.height);
+  const colors = worldData.countries.map((country) => {
+    const value = Number.parseInt(country.color.slice(1), 16);
+    return [(value >> 16) & 255, (value >> 8) & 255, value & 255];
+  });
+
+  for (let y = 0; y < worldData.height; y++) {
+    for (let x = 0; x < worldData.width; x++) {
+      const index = y * worldData.width + x;
+      const cell = worldData.cells[index];
+      const offset = index * 4;
+      if (cell.countryIndex < 0) {
+        const latitude = Math.abs((y / worldData.height) * 2 - 1);
+        const depth = Math.round(8 + (1 - latitude) * 13);
+        image.data[offset] = 12;
+        image.data[offset + 1] = 37 + depth;
+        image.data[offset + 2] = 58 + depth * 2;
+        image.data[offset + 3] = 255;
+        continue;
+      }
+
+      const base = colors[cell.countryIndex];
+      let shade = 0;
+      if (cell.terrain === 'coast') shade = 18;
+      else if (cell.terrain === 'highlands') shade = -12;
+      else if (cell.terrain === 'mountains') shade = 26;
+
+      const rightX = (x + 1) % worldData.width;
+      const right = worldData.cells[y * worldData.width + rightX];
+      const down = y + 1 < worldData.height ? worldData.cells[(y + 1) * worldData.width + x] : null;
+      const border = (right.countryIndex >= 0 && right.countryIndex !== cell.countryIndex)
+        || (down !== null && down.countryIndex >= 0 && down.countryIndex !== cell.countryIndex);
+      const borderShade = border ? 0.42 : 1;
+      image.data[offset] = Math.max(0, Math.min(255, (base[0] + shade) * borderShade));
+      image.data[offset + 1] = Math.max(0, Math.min(255, (base[1] + shade) * borderShade));
+      image.data[offset + 2] = Math.max(0, Math.min(255, (base[2] + shade) * borderShade));
+      image.data[offset + 3] = 255;
     }
-    context.closePath();
-    context.fillStyle = landColors[Math.floor(rand() * landColors.length)];
-    context.fill();
-    context.strokeStyle = 'rgba(190, 190, 145, 0.22)';
-    context.lineWidth = 3;
-    context.stroke();
   }
 
-  // Fine atmospheric/cloud streaks.
+  mapContext.putImageData(image, 0, 0);
+  context.imageSmoothingEnabled = true;
+  context.drawImage(mapCanvas, 0, 0, canvas.width, canvas.height);
+
+  // Fine atmospheric streaks sit above the authoritative geography layer.
+  const rand = random(worldData.seed + 701);
   for (let i = 0; i < 420; i++) {
     const x = rand() * canvas.width;
     const y = rand() * canvas.height;
@@ -96,7 +119,7 @@ function createPlanetTexture(): THREE.CanvasTexture {
     context.beginPath();
     context.moveTo(x, y);
     context.quadraticCurveTo(x + length * 0.5, y - 5 - rand() * 12, x + length, y + rand() * 5);
-    context.strokeStyle = `rgba(220, 231, 235, ${0.025 + rand() * 0.075})`;
+    context.strokeStyle = 'rgba(220, 231, 235, ' + (0.018 + rand() * 0.055) + ')';
     context.lineWidth = 1 + rand() * 4;
     context.stroke();
   }
@@ -106,13 +129,12 @@ function createPlanetTexture(): THREE.CanvasTexture {
   texture.anisotropy = renderer.capabilities.getMaxAnisotropy();
   return texture;
 }
-
 const planetGroup = new THREE.Group();
 scene.add(planetGroup);
 
 const planetGeometry = new THREE.SphereGeometry(1.55, 96, 64);
 const planetMaterial = new THREE.MeshStandardMaterial({
-  map: createPlanetTexture(),
+  map: createPlanetTexture(world),
   roughness: 0.92,
   metalness: 0.02
 });
