@@ -238,6 +238,10 @@ function createPlanetTexture(worldData: PlanetWorld): THREE.CanvasTexture {
 }
 const planetGroup = new THREE.Group();
 scene.add(planetGroup);
+// Manual user rotation stays on the outer group. The inner group supplies the
+// independent daily axial spin, leaving the sun, moon and stars fixed in space.
+const planetSpin = new THREE.Group();
+planetGroup.add(planetSpin);
 
 function sampleSurface(u: number, v: number): { elevation: number; land: number } {
   const wrappedU = ((u % 1) + 1) % 1;
@@ -403,15 +407,15 @@ const planetMaterial = new THREE.MeshStandardMaterial({
   metalness: 0.02
 });
 const planet = new THREE.Mesh(planetGeometry, planetMaterial);
-planetGroup.add(planet);
+planetSpin.add(planet);
 const countryBorders = createCountryBorderOverlay(world);
-planetGroup.add(countryBorders);
+planetSpin.add(countryBorders);
 
 const atmosphere = new THREE.Mesh(
   new THREE.SphereGeometry(1.79, 96, 64),
   new THREE.MeshBasicMaterial({ color: 0x688cff, transparent: true, opacity: 0.10, side: THREE.BackSide })
 );
-planetGroup.add(atmosphere);
+planetSpin.add(atmosphere);
 
 const starGeometry = new THREE.BufferGeometry();
 const starPositions: number[] = [];
@@ -433,7 +437,8 @@ const starMaterial = new THREE.PointsMaterial({
 const stars = new THREE.Points(starGeometry, starMaterial);
 scene.add(stars);
 
-// The sun and moon orbit once per simulated day (24 real minutes at the current clock rate).
+// Celestial objects occupy fixed world-space positions. The planet rotates beneath
+// the fixed sun to create the day/night cycle; manual globe dragging never moves them.
 const sun = new THREE.Mesh(
   new THREE.SphereGeometry(0.42, 32, 24),
   new THREE.MeshBasicMaterial({ color: 0xffd27a })
@@ -512,10 +517,12 @@ renderer.domElement.addEventListener('pointermove', (event) => {
     clickCandidate = false;
   }
 
-  // Direct manipulation: the globe follows the pointer immediately, at every zoom level.
-  // Both axes are unbounded so users can turn the planet through complete 360-degree rotations.
-  planetGroup.rotation.y += deltaX * 0.009;
-  planetGroup.rotation.x += deltaY * 0.009;
+  // Smaller angular movement per screen pixel, with an additional reduction
+  // when zoomed in so close-up navigation remains controlled.
+  const zoomSensitivity = THREE.MathUtils.clamp(cameraDistance / 4.65, 0.38, 1);
+  const rotationSensitivity = 0.0042 * zoomSensitivity;
+  planetGroup.rotation.y += deltaX * rotationSensitivity;
+  planetGroup.rotation.x += deltaY * rotationSensitivity;
 });
 
 function selectCountryAtPointer(clientX: number, clientY: number): void {
@@ -665,20 +672,17 @@ function animate(now: number): void {
   camera.position.set(0, 0, cameraDistance);
   camera.lookAt(0, 0, 0);
 
-  const dayAngle = (simulationMinutes / 1440) * Math.PI * 2 + Math.PI / 2;
-  const orbitRadius = 13;
-  const sunPosition = new THREE.Vector3(
-    Math.cos(dayAngle) * orbitRadius,
-    Math.sin(dayAngle) * orbitRadius * 0.32,
-    Math.sin(dayAngle) * orbitRadius
-  );
+  const dayAngle = (simulationMinutes / 1440) * Math.PI * 2;
+  const sunPosition = new THREE.Vector3(-8, 3.5, 10);
+  const moonPosition = new THREE.Vector3(7, 2.5, 10);
   sun.position.copy(sunPosition);
   keyLight.position.copy(sunPosition);
-  const moonPosition = sunPosition.clone().multiplyScalar(-1);
   moon.position.copy(moonPosition);
   moonLight.position.copy(moonPosition);
-  starMaterial.opacity = 0.28 + (1 - Math.max(0, Math.sin(dayAngle))) * 0.58;
-  stars.rotation.y += 0.000025;
+  // One complete axial rotation equals one simulated day (24 real minutes).
+  // The stars remain a stationary backdrop rather than rotating with the planet.
+  planetSpin.rotation.y = dayAngle;
+  starMaterial.opacity = 0.72;
   renderer.render(scene, camera);
 }
 renderClock();
