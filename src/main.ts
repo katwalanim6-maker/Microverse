@@ -110,14 +110,16 @@ renderer.toneMapping = THREE.ACESFilmicToneMapping;
 renderer.toneMappingExposure = 1.15;
 mountElement.appendChild(renderer.domElement);
 
-const ambient = new THREE.AmbientLight(0x8293c4, 1.15);
+// Soft base illumination remains low enough for the moving day/night terminator to read.
+const ambient = new THREE.AmbientLight(0x8293c4, 0.34);
 scene.add(ambient);
 
-const keyLight = new THREE.DirectionalLight(0xffe2c2, 2.5);
-keyLight.position.set(-3, 2, 4);
+const keyLight = new THREE.DirectionalLight(0xffe2c2, 2.8);
 scene.add(keyLight);
+const moonLight = new THREE.DirectionalLight(0x9eb8ff, 0.22);
+scene.add(moonLight);
 
-const rimLight = new THREE.PointLight(0x6e68ff, 16, 12);
+const rimLight = new THREE.PointLight(0x6e68ff, 12, 14);
 rimLight.position.set(3, -1, -3);
 scene.add(rimLight);
 
@@ -414,8 +416,8 @@ planetGroup.add(atmosphere);
 const starGeometry = new THREE.BufferGeometry();
 const starPositions: number[] = [];
 const starRand = random(99173);
-for (let i = 0; i < 900; i++) {
-  const radius = 7 + starRand() * 18;
+for (let i = 0; i < 1500; i++) {
+  const radius = 9 + starRand() * 23;
   const theta = starRand() * Math.PI * 2;
   const phi = Math.acos(2 * starRand() - 1);
   starPositions.push(
@@ -425,46 +427,97 @@ for (let i = 0; i < 900; i++) {
   );
 }
 starGeometry.setAttribute('position', new THREE.Float32BufferAttribute(starPositions, 3));
-const stars = new THREE.Points(
-  starGeometry,
-  new THREE.PointsMaterial({ color: 0xcbd2ff, size: 0.025, transparent: true, opacity: 0.8 })
-);
+const starMaterial = new THREE.PointsMaterial({
+  color: 0xdce2ff, size: 0.028, transparent: true, opacity: 0.78, sizeAttenuation: true
+});
+const stars = new THREE.Points(starGeometry, starMaterial);
 scene.add(stars);
 
+// The sun and moon orbit once per simulated day (24 real minutes at the current clock rate).
+const sun = new THREE.Mesh(
+  new THREE.SphereGeometry(0.42, 32, 24),
+  new THREE.MeshBasicMaterial({ color: 0xffd27a })
+);
+scene.add(sun);
+const sunGlow = new THREE.Mesh(
+  new THREE.SphereGeometry(0.66, 24, 16),
+  new THREE.MeshBasicMaterial({ color: 0xffb84d, transparent: true, opacity: 0.16, side: THREE.BackSide })
+);
+sun.add(sunGlow);
+const moon = new THREE.Mesh(
+  new THREE.SphereGeometry(0.25, 32, 24),
+  new THREE.MeshStandardMaterial({ color: 0xcbd5e8, roughness: 0.9, metalness: 0.02, emissive: 0x202b45 })
+);
+scene.add(moon);
+const moonHalo = new THREE.Mesh(
+  new THREE.SphereGeometry(0.38, 20, 16),
+  new THREE.MeshBasicMaterial({ color: 0x9eb8ff, transparent: true, opacity: 0.12, side: THREE.BackSide })
+);
+moon.add(moonHalo);
+
+const activePointers = new Map<number, { x: number; y: number }>();
+const pointerStarts = new Map<number, { x: number; y: number }>();
 let dragging = false;
-let previousX = 0;
-let previousY = 0;
-let pointerStartX = 0;
-let pointerStartY = 0;
-let targetRotationY = 0.35;
-let targetRotationX = 0.12;
+let pinchZoomActive = false;
+let pinchDistance = 0;
+let clickCandidate = false;
 let cameraDistance = 4.65;
 
+function distanceBetweenPointers(): number {
+  const points = [...activePointers.values()];
+  if (points.length < 2) return 0;
+  return Math.hypot(points[0].x - points[1].x, points[0].y - points[1].y);
+}
+
 renderer.domElement.addEventListener('pointerdown', (event) => {
-  if (event.button !== 0 && event.pointerType === 'mouse') return;
-  dragging = true;
-  previousX = event.clientX;
-  previousY = event.clientY;
-  pointerStartX = event.clientX;
-  pointerStartY = event.clientY;
+  if (event.pointerType === 'mouse' && event.button !== 0) return;
   renderer.domElement.setPointerCapture(event.pointerId);
+  activePointers.set(event.pointerId, { x: event.clientX, y: event.clientY });
+  pointerStarts.set(event.pointerId, { x: event.clientX, y: event.clientY });
+  if (activePointers.size === 1) {
+    dragging = true;
+    clickCandidate = true;
+  } else {
+    // A multi-touch gesture is exclusively a zoom gesture, never a rotation gesture.
+    dragging = false;
+    clickCandidate = false;
+    pinchZoomActive = true;
+    pinchDistance = distanceBetweenPointers();
+  }
 });
+
 renderer.domElement.addEventListener('pointermove', (event) => {
-  if (!dragging || pinchZoomActive) return;
-  const deltaX = event.clientX - previousX;
-  const deltaY = event.clientY - previousY;
+  const previous = activePointers.get(event.pointerId);
+  if (!previous) return;
+  const next = { x: event.clientX, y: event.clientY };
+  activePointers.set(event.pointerId, next);
 
-  // Higher sensitivity and quicker visual follow make the globe track the user's hand.
-  targetRotationY += deltaX * 0.009;
-  targetRotationX = THREE.MathUtils.clamp(
-    targetRotationX + deltaY * 0.006,
-    -1.1,
-    1.1
-  );
+  if (activePointers.size >= 2) {
+    const nextDistance = distanceBetweenPointers();
+    if (pinchDistance > 0 && nextDistance > 0) {
+      cameraDistance = THREE.MathUtils.clamp(
+        cameraDistance + (pinchDistance - nextDistance) * 0.010,
+        1.94,
+        12
+      );
+    }
+    pinchDistance = nextDistance;
+    return;
+  }
 
-  previousX = event.clientX;
-  previousY = event.clientY;
+  const deltaX = next.x - previous.x;
+  const deltaY = next.y - previous.y;
+  if (Math.hypot(next.x - (pointerStarts.get(event.pointerId)?.x ?? next.x),
+                 next.y - (pointerStarts.get(event.pointerId)?.y ?? next.y)) > 7) {
+    clickCandidate = false;
+  }
+
+  // Direct manipulation: the globe follows the pointer immediately, at every zoom level.
+  // Both axes are unbounded so users can turn the planet through complete 360-degree rotations.
+  planetGroup.rotation.y += deltaX * 0.009;
+  planetGroup.rotation.x += deltaY * 0.009;
 });
+
 function selectCountryAtPointer(clientX: number, clientY: number): void {
   const rect = renderer.domElement.getBoundingClientRect();
   const pointer = new THREE.Vector2(
@@ -495,43 +548,40 @@ function selectCountryAtPointer(clientX: number, clientY: number): void {
   }
   if (cell && cell.countryIndex >= 0) showCountry(world.countries[cell.countryIndex]);
 }
-const stopDrag = (event: PointerEvent) => {
-  const wasClick = Math.hypot(event.clientX - pointerStartX, event.clientY - pointerStartY) < 7;
-  dragging = false;
-  if (wasClick) selectCountryAtPointer(event.clientX, event.clientY);
-};
-renderer.domElement.addEventListener('pointerup', stopDrag);
-renderer.domElement.addEventListener('pointercancel', () => { dragging = false; });
+
+function finishPointer(event: PointerEvent): void {
+  const start = pointerStarts.get(event.pointerId);
+  const wasSinglePointerClick = clickCandidate
+    && activePointers.size === 1
+    && start !== undefined
+    && Math.hypot(event.clientX - start.x, event.clientY - start.y) < 7;
+  activePointers.delete(event.pointerId);
+  pointerStarts.delete(event.pointerId);
+
+  if (activePointers.size === 0) {
+    dragging = false;
+    pinchZoomActive = false;
+    pinchDistance = 0;
+    if (wasSinglePointerClick) selectCountryAtPointer(event.clientX, event.clientY);
+  } else if (activePointers.size === 1) {
+    // Rebase the remaining finger so lifting one finger never causes a rotation jump.
+    const remaining = [...activePointers.entries()][0];
+    activePointers.set(remaining[0], { ...remaining[1] });
+    pointerStarts.set(remaining[0], { ...remaining[1] });
+    dragging = true;
+    pinchZoomActive = false;
+    pinchDistance = 0;
+    clickCandidate = false;
+  } else {
+    pinchDistance = distanceBetweenPointers();
+  }
+}
+renderer.domElement.addEventListener('pointerup', finishPointer);
+renderer.domElement.addEventListener('pointercancel', finishPointer);
 renderer.domElement.addEventListener('wheel', (event) => {
   event.preventDefault();
-  cameraDistance = THREE.MathUtils.clamp(cameraDistance + event.deltaY * 0.0025, 1.94, 9.5);
+  cameraDistance = THREE.MathUtils.clamp(cameraDistance + event.deltaY * 0.0025, 1.94, 12);
 }, { passive: false });
-
-let touchDistance = 0;
-let pinchZoomActive = false;
-renderer.domElement.addEventListener('touchstart', (event) => {
-  if (event.touches.length === 2) {
-    pinchZoomActive = true;
-    dragging = false;
-    const a = event.touches[0];
-    const b = event.touches[1];
-    touchDistance = Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY);
-  }
-}, { passive: true });
-renderer.domElement.addEventListener('touchmove', (event) => {
-  if (event.touches.length !== 2 || touchDistance === 0) return;
-  const a = event.touches[0];
-  const b = event.touches[1];
-  const nextDistance = Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY);
-  cameraDistance = THREE.MathUtils.clamp(cameraDistance + (touchDistance - nextDistance) * 0.010, 1.94, 9.5);
-  touchDistance = nextDistance;
-}, { passive: true });
-renderer.domElement.addEventListener('touchend', (event) => {
-  if (event.touches.length < 2) {
-    touchDistance = 0;
-    pinchZoomActive = false;
-  }
-}, { passive: true });
 
 function resize(): void {
   const width = Math.max(1, mountElement.clientWidth);
@@ -612,13 +662,23 @@ function animate(now: number): void {
   renderClock();
   const zoomLabel = cameraDistance < 2.45 ? 'CLOSE VIEW · ELEVATION & RIVERS' : cameraDistance < 3.4 ? 'LOCAL VIEW · TERRAIN & BIOMES' : cameraDistance < 4.8 ? 'REGIONAL VIEW · COUNTRY GEOGRAPHY' : cameraDistance < 6.5 ? 'CONTINENT VIEW · NATIONAL BORDERS' : 'PLANET VIEW · GLOBAL DETAIL';
   if (zoomLevelNode && zoomLevelNode.textContent !== zoomLabel) zoomLevelNode.textContent = zoomLabel;
-  // Faster damping reduces the lag between pointer movement and globe rotation.
-  const rotationFollow = dragging ? 0.42 : 0.16;
-  planetGroup.rotation.y += (targetRotationY - planetGroup.rotation.y) * rotationFollow;
-  planetGroup.rotation.x += (targetRotationX - planetGroup.rotation.x) * rotationFollow;
   camera.position.set(0, 0, cameraDistance);
   camera.lookAt(0, 0, 0);
-  stars.rotation.y += 0.00004;
+
+  const dayAngle = (simulationMinutes / 1440) * Math.PI * 2 - Math.PI / 2;
+  const orbitRadius = 13;
+  const sunPosition = new THREE.Vector3(
+    Math.cos(dayAngle) * orbitRadius,
+    Math.sin(dayAngle) * orbitRadius * 0.32,
+    Math.sin(dayAngle) * orbitRadius
+  );
+  sun.position.copy(sunPosition);
+  keyLight.position.copy(sunPosition);
+  const moonPosition = sunPosition.clone().multiplyScalar(-1);
+  moon.position.copy(moonPosition);
+  moonLight.position.copy(moonPosition);
+  starMaterial.opacity = 0.28 + (1 - Math.max(0, Math.sin(dayAngle))) * 0.58;
+  stars.rotation.y += 0.000025;
   renderer.render(scene, camera);
 }
 renderClock();
