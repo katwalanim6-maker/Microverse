@@ -25,9 +25,11 @@ const mountElement = mount;
 const dateElement = dateNode;
 const timeElement = timeNode;
 const statusElement = statusNode;
+const worldPageElement = worldPageNode;
+const infoPageElement = infoPageNode;
 function setActivePage(page: 'world' | 'info'): void {
-  worldPageNode.hidden = page !== 'world';
-  infoPageNode.hidden = page !== 'info';
+  worldPageElement.hidden = page !== 'world';
+  infoPageElement.hidden = page !== 'info';
   pageButtons.forEach((button) => button.classList.toggle('active', button.dataset.page === page));
   if (page === 'world') resize();
 }
