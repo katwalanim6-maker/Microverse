@@ -101,7 +101,7 @@ const scene = new THREE.Scene();
 scene.background = new THREE.Color('#080a12');
 
 // Wide framing shows the Sun, Earth and Moon together at the starting zoom.
-const camera = new THREE.PerspectiveCamera(72, 1, 0.1, 160);
+const camera = new THREE.PerspectiveCamera(72, 1, 0.1, 220);
 camera.position.set(0, 0, 28);
 // The observer camera orbits Earth; dragging never rotates the planet or celestial bodies.
 let cameraAzimuth = 0;
@@ -287,7 +287,7 @@ function sampleSurface(u: number, v: number): { elevation: number; land: number 
   };
 }
 
-const planetGeometry = new THREE.SphereGeometry(1.72, 720, 360);
+const planetGeometry = new THREE.SphereGeometry(1.72, 1080, 540);
 const positions = planetGeometry.getAttribute('position');
 const uvs = planetGeometry.getAttribute('uv');
 for (let vertex = 0; vertex < positions.count; vertex++) {
@@ -471,14 +471,14 @@ const sunGlow = new THREE.Mesh(
 );
 sun.add(sunGlow);
 const moon = new THREE.Mesh(
-  new THREE.SphereGeometry(0.25, 32, 24),
+  new THREE.SphereGeometry(0.20, 28, 20),
   new THREE.MeshStandardMaterial({ color: 0xcbd5e8, roughness: 0.9, metalness: 0.02, emissive: 0x202b45 })
 );
-// The Moon remains closer than the Sun, but has a more readable orbital gap.
-moon.position.set(7.4, 0, 0);
+// The Moon follows a wider 43-unit orbit around Earth and is slightly smaller.
+moon.position.set(43, 0, 0);
 moonOrbit.add(moon);
 const moonHalo = new THREE.Mesh(
-  new THREE.SphereGeometry(0.38, 20, 16),
+  new THREE.SphereGeometry(0.30, 18, 14),
   new THREE.MeshBasicMaterial({ color: 0x9eb8ff, transparent: true, opacity: 0.12, side: THREE.BackSide })
 );
 moon.add(moonHalo);
@@ -521,7 +521,7 @@ renderer.domElement.addEventListener('pointermove', (event) => {
       cameraDistance = THREE.MathUtils.clamp(
         cameraDistance + (pinchDistance - nextDistance) * 0.010,
         2.05,
-        40
+        90
       );
     }
     pinchDistance = nextDistance;
@@ -602,7 +602,7 @@ renderer.domElement.addEventListener('pointerup', finishPointer);
 renderer.domElement.addEventListener('pointercancel', finishPointer);
 renderer.domElement.addEventListener('wheel', (event) => {
   event.preventDefault();
-  cameraDistance = THREE.MathUtils.clamp(cameraDistance + event.deltaY * 0.0025, 2.05, 40);
+  cameraDistance = THREE.MathUtils.clamp(cameraDistance + event.deltaY * 0.0025, 2.05, 90);
 }, { passive: false });
 
 function resize(): void {
@@ -682,7 +682,7 @@ function animate(now: number): void {
   lastWallClockMs = Date.now();
   simulationMinutes += elapsedSeconds;
   renderClock();
-  const zoomLabel = cameraDistance < 2.45 ? 'CLOSE VIEW · ELEVATION & RIVERS' : cameraDistance < 3.4 ? 'LOCAL VIEW · TERRAIN & BIOMES' : cameraDistance < 4.8 ? 'REGIONAL VIEW · COUNTRY GEOGRAPHY' : cameraDistance < 6.5 ? 'CONTINENT VIEW · NATIONAL BORDERS' : 'PLANET VIEW · GLOBAL DETAIL';
+  const zoomLabel = cameraDistance < 2.45 ? 'CLOSE VIEW · ELEVATION & RIVERS' : cameraDistance < 3.4 ? 'LOCAL VIEW · TERRAIN & BIOMES' : cameraDistance < 4.8 ? 'REGIONAL VIEW · COUNTRY GEOGRAPHY' : cameraDistance < 6.5 ? 'CONTINENT VIEW · NATIONAL BORDERS' : cameraDistance > 24 ? 'SYSTEM VIEW · SUN & MOON' : 'PLANET VIEW · GLOBAL DETAIL';
   if (zoomLevelNode && zoomLevelNode.textContent !== zoomLabel) zoomLevelNode.textContent = zoomLabel;
   // Orbital periods follow the world's calendar:
   // Earth day = 1,440 simulation minutes; Moon month = 30 days;
