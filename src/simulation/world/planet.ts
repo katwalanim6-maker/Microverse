@@ -3,10 +3,21 @@ export const INITIAL_POPULATION_PER_COUNTRY = 1_000_000;
 export const COUNTRY_COUNT = 100;
 export const INITIAL_POPULATION = COUNTRY_COUNT * INITIAL_POPULATION_PER_COUNTRY;
 export const TARGET_LAND_PERCENT = 73;
-export const MAP_WIDTH = 360;
-export const MAP_HEIGHT = 180;
+export const MAP_WIDTH = 540;
+export const MAP_HEIGHT = 270;
 
 export type Terrain = 'ocean' | 'coast' | 'plains' | 'highlands' | 'mountains';
+export type Biome = 'ocean' | 'coast' | 'grassland' | 'forest' | 'desert' | 'tundra' | 'alpine';
+
+export interface CountryGeography {
+  surfaceAreaPercent: number;
+  landSharePercent: number;
+  coastlineCells: number;
+  riverCells: number;
+  highestElevation: number;
+  terrain: Record<'coast' | 'plains' | 'highlands' | 'mountains', number>;
+  biomes: Record<'coast' | 'grassland' | 'forest' | 'desert' | 'tundra' | 'alpine', number>;
+}
 
 export interface Country {
   id: string;
@@ -20,12 +31,18 @@ export interface Country {
   economy: string;
   foundedYear: number | null;
   status: 'unsettled' | 'established';
+  geography: CountryGeography;
 }
 
 export interface WorldCell {
   terrain: Terrain;
   countryIndex: number;
   population: number;
+  elevation: number;
+  moisture: number;
+  temperature: number;
+  biome: Biome;
+  river: boolean;
 }
 
 export interface PlanetWorld {
@@ -88,8 +105,8 @@ function generateLandmasses(rand: () => number): Landmass[] {
     masses.push({
       x: rand() * MAP_WIDTH,
       y: 18 + rand() * (MAP_HEIGHT - 36),
-      rx: 18 + rand() * 31,
-      ry: 11 + rand() * 22,
+      rx: 27 + rand() * 46,
+      ry: 16 + rand() * 33,
       rotation: (rand() - 0.5) * 1.2,
       strength: 0.78 + rand() * 0.22
     });
@@ -110,9 +127,9 @@ function landScore(x: number, y: number, masses: Landmass[], seed: number): numb
     continental = Math.max(continental, influence);
   }
   return continental
-    + (smoothNoise(x / 30, y / 22, seed) - 0.5) * 0.28
-    + (smoothNoise(x / 9, y / 8, seed + 91) - 0.5) * 0.12
-    + (smoothNoise(x / 3.5, y / 3.5, seed + 177) - 0.5) * 0.045;
+    + (smoothNoise(x / 45, y / 33, seed) - 0.5) * 0.28
+    + (smoothNoise(x / 13.5, y / 12, seed + 91) - 0.5) * 0.12
+    + (smoothNoise(x / 5.25, y / 5.25, seed + 177) - 0.5) * 0.045;
 }
 
 function selectCountrySeeds(landIndices: number[], rand: () => number): CountrySeed[] {
@@ -205,13 +222,15 @@ export function generatePlanetWorld(seed = WORLD_SEED): PlanetWorld {
   const cells: WorldCell[] = new Array(ranked.length);
   const countryLandCounts = new Array(COUNTRY_COUNT).fill(0) as number[];
   const countryWeights = new Array(COUNTRY_COUNT).fill(0) as number[];
+  const countrySurfaceWeights = new Array(COUNTRY_COUNT).fill(0) as number[];
+  const landThreshold = scores[landIndices[landIndices.length - 1]];
   const cellWeights = new Float64Array(ranked.length);
 
   for (let y = 0; y < MAP_HEIGHT; y++) {
     for (let x = 0; x < MAP_WIDTH; x++) {
       const index = y * MAP_WIDTH + x;
       if (!rawLand[index]) {
-        cells[index] = { terrain: 'ocean', countryIndex: -1, population: 0 };
+        cells[index] = { terrain: 'ocean', countryIndex: -1, population: 0, elevation: 0, moisture: 0, temperature: 0, biome: 'ocean', river: false };
         continue;
       }
       let nearest = 0;
@@ -226,20 +245,107 @@ export function generatePlanetWorld(seed = WORLD_SEED): PlanetWorld {
         }
       }
       const score = scores[index];
-      const baseTerrain: Terrain = score > 0.49 ? 'mountains' : score > 0.34 ? 'highlands' : 'plains';
+      const broadRelief = smoothNoise(x / 25, y / 19, seed + 201);
+      const ridgeNoise = 1 - Math.abs(smoothNoise(x / 8, y / 7, seed + 207) * 2 - 1);
+      const fineRelief = smoothNoise(x / 3.2, y / 3.2, seed + 209);
+      const relativeElevation = Math.max(0, Math.min(1,
+        ((score - landThreshold) / 0.62) * 0.62 + broadRelief * 0.18 + ridgeNoise * 0.14 + fineRelief * 0.06
+      ));
+      const baseTerrain: Terrain = relativeElevation > 0.72 ? 'mountains' : relativeElevation > 0.39 ? 'highlands' : 'plains';
       const left = y * MAP_WIDTH + (x === 0 ? MAP_WIDTH - 1 : x - 1);
       const right = y * MAP_WIDTH + (x === MAP_WIDTH - 1 ? 0 : x + 1);
       const up = y > 0 ? index - MAP_WIDTH : -1;
       const down = y < MAP_HEIGHT - 1 ? index + MAP_WIDTH : -1;
       const nearOcean = [left, right, up, down].some((neighbor) => neighbor >= 0 && !rawLand[neighbor]);
-      cells[index] = { terrain: nearOcean ? 'coast' : baseTerrain, countryIndex: nearest, population: 0 };
+      const terrain: Terrain = nearOcean ? 'coast' : baseTerrain;
+      const latitude = 1 - Math.abs((y / (MAP_HEIGHT - 1)) * 2 - 1);
+      const moisture = Math.max(0, Math.min(1,
+        smoothNoise(x / 19, y / 14, seed + 311) * 0.55
+        + smoothNoise(x / 5.5, y / 4.5, seed + 313) * 0.25
+        + (nearOcean ? 0.16 : 0.04)
+      ));
+      const temperature = Math.max(0, Math.min(1, latitude * 0.92 + 0.08 - relativeElevation * 0.22));
+      const biome: Biome = baseTerrain === 'mountains' && relativeElevation > 0.78
+        ? 'alpine'
+        : temperature < 0.2 ? 'tundra'
+        : moisture < 0.22 ? 'desert'
+        : moisture > 0.62 ? 'forest'
+        : 'grassland';
+      cells[index] = {
+        terrain, countryIndex: nearest, population: 0,
+        elevation: relativeElevation, moisture, temperature, biome, river: false
+      };
       countryLandCounts[nearest]++;
-      const latitudeFactor = 0.55 + (1 - Math.abs((y / MAP_HEIGHT) * 2 - 1)) * 0.45;
+      const latitudeFactor = 0.55 + latitude * 0.45;
       const terrainFactor = baseTerrain === 'mountains' ? 0.28 : baseTerrain === 'highlands' ? 0.72 : 1;
       const weight = latitudeFactor * terrainFactor * (nearOcean ? 1.25 : 1);
       cellWeights[index] = weight;
       countryWeights[nearest] += weight;
+      countrySurfaceWeights[nearest] += Math.cos((0.5 - y / MAP_HEIGHT) * Math.PI);
     }
+  }
+
+  // Trace a natural drainage path from each country's highest interior point.
+  // Rivers follow downhill cells and terminate at the coast or ocean.
+  for (let countryIndex = 0; countryIndex < COUNTRY_COUNT; countryIndex++) {
+    let source = -1;
+    let highest = 0.34;
+    for (let index = 0; index < cells.length; index++) {
+      const cell = cells[index];
+      if (cell.countryIndex === countryIndex && cell.terrain !== 'coast' && cell.elevation > highest) {
+        highest = cell.elevation;
+        source = index;
+      }
+    }
+    if (source < 0) continue;
+    let current = source;
+    const visited = new Set<number>();
+    for (let step = 0; step < 220; step++) {
+      if (visited.has(current)) break;
+      visited.add(current);
+      const currentCell = cells[current];
+      currentCell.river = true;
+      if (currentCell.terrain === 'coast') break;
+      const cx = current % MAP_WIDTH;
+      const cy = Math.floor(current / MAP_WIDTH);
+      let next = -1;
+      let lowest = currentCell.elevation;
+      for (let dy = -1; dy <= 1; dy++) {
+        for (let dx = -1; dx <= 1; dx++) {
+          if (dx === 0 && dy === 0) continue;
+          const ny = cy + dy;
+          if (ny < 0 || ny >= MAP_HEIGHT) continue;
+          const nx = (cx + dx + MAP_WIDTH) % MAP_WIDTH;
+          const candidateIndex = ny * MAP_WIDTH + nx;
+          const candidate = cells[candidateIndex];
+          const candidateHeight = candidate.terrain === 'ocean' ? -1 : candidate.elevation;
+          if (candidateHeight < lowest) {
+            lowest = candidateHeight;
+            next = candidateIndex;
+          }
+        }
+      }
+      if (next < 0) break;
+      current = next;
+      if (cells[current].terrain === 'ocean') break;
+    }
+  }
+
+  const geography = Array.from({ length: COUNTRY_COUNT }, () => ({
+    coastlineCells: 0,
+    riverCells: 0,
+    highestElevation: 0,
+    terrain: { coast: 0, plains: 0, highlands: 0, mountains: 0 },
+    biomes: { coast: 0, grassland: 0, forest: 0, desert: 0, tundra: 0, alpine: 0 }
+  }));
+  for (const cell of cells) {
+    if (cell.countryIndex < 0) continue;
+    const stats = geography[cell.countryIndex];
+    if (cell.terrain === 'coast') stats.coastlineCells++;
+    else stats.terrain[cell.terrain]++;
+    if (cell.river) stats.riverCells++;
+    stats.highestElevation = Math.max(stats.highestElevation, cell.elevation);
+    stats.biomes[cell.terrain === 'coast' ? 'coast' : cell.biome]++;
   }
 
   const countries: Country[] = COUNTRY_NAMES.map((name, index) => ({
@@ -253,7 +359,12 @@ export function generatePlanetWorld(seed = WORLD_SEED): PlanetWorld {
     currency: 'Not yet established',
     economy: 'Not yet established',
     foundedYear: null,
-    status: 'unsettled'
+    status: 'unsettled',
+    geography: {
+      surfaceAreaPercent: countrySurfaceWeights[index] / totalSurfaceWeight * 100,
+      landSharePercent: countrySurfaceWeights[index] / selectedSurfaceWeight * 100,
+      ...geography[index]
+    }
   }));
 
   // Allocate exactly one million people to each country, then distribute them across its land.
