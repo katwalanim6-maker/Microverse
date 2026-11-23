@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { generatePlanetWorld, getWorldSummary, type PlanetWorld } from './simulation/world/planet';
+import { generatePlanetWorld, getWorldSummary, type Biome, type PlanetWorld } from './simulation/world/planet';
 import './style.css';
 
 const mount = document.querySelector<HTMLDivElement>('#planet-canvas');
@@ -45,15 +45,15 @@ function showCountry(country: PlanetWorld['countries'][number]): void {
   for (const cell of countryCells) {
     if (cell.terrain in terrainCount) terrainCount[cell.terrain as keyof typeof terrainCount]++;
   }
-  const landShare = (country.landCells / world.cells.filter((cell) => cell.countryIndex >= 0).length) * world.landPercent;
+  const landShare = country.geography.surfaceAreaPercent;
   const density = country.landCells > 0 ? country.population / country.landCells : 0;
   countryDetailNode.innerHTML = `
     <div class="country-title-row"><span class="country-swatch" style="--country-color:${country.color}"></span><div><p class="eyebrow">COUNTRY PROFILE // ${country.id.toUpperCase()}</p><h3>${country.name}</h3><span class="country-status">FOUNDATION STATUS: ${country.status.toUpperCase()}</span></div></div>
     <div class="country-stat-grid">
       <div><small>POPULATION</small><strong>${country.population.toLocaleString('en-US')}</strong></div>
       <div><small>LAND CELLS</small><strong>${country.landCells.toLocaleString('en-US')}</strong></div>
-      <div><small>SHARE OF LAND</small><strong>${landShare.toFixed(2)}%</strong></div>
-      <div><small>PEOPLE / CELL</small><strong>${Math.round(density).toLocaleString('en-US')}</strong></div>
+      <div><small>PLANET SURFACE</small><strong>${landShare.toFixed(2)}%</strong></div>
+      <div><small>SHARE OF LAND</small><strong>${country.geography.landSharePercent.toFixed(2)}%</strong></div>
     </div>
     <div class="country-info-heading">NATIONAL INFORMATION</div>
     <dl class="country-facts">
@@ -63,9 +63,22 @@ function showCountry(country: PlanetWorld['countries'][number]): void {
       <div><dt>Economic model</dt><dd>${country.economy}</dd></div>
       <div><dt>Founded</dt><dd>${country.foundedYear === null ? 'Not established' : `Year ${country.foundedYear}`}</dd></div>
     </dl>
-    <div class="country-info-heading">GEOGRAPHY</div>
+    <div class="country-info-heading">PHYSICAL GEOGRAPHY</div>
     <div class="terrain-bars">
-      <span>Plains <b>${terrainCount.plains}</b></span><span>Highlands <b>${terrainCount.highlands}</b></span><span>Mountains <b>${terrainCount.mountains}</b></span><span>Coastal cells <b>${terrainCount.coast}</b></span>
+      <span>Plains <b>${country.geography.terrain.plains.toLocaleString('en-US')}</b></span>
+      <span>Highlands <b>${country.geography.terrain.highlands.toLocaleString('en-US')}</b></span>
+      <span>Mountains <b>${country.geography.terrain.mountains.toLocaleString('en-US')}</b></span>
+      <span>Coastal cells <b>${country.geography.coastlineCells.toLocaleString('en-US')}</b></span>
+      <span>River cells <b>${country.geography.riverCells.toLocaleString('en-US')}</b></span>
+      <span>Highest relief <b>${Math.round(country.geography.highestElevation * 100)} / 100</b></span>
+    </div>
+    <div class="country-info-heading">BIOMES</div>
+    <div class="terrain-bars">
+      <span>Forest <b>${country.geography.biomes.forest}</b></span>
+      <span>Grassland <b>${country.geography.biomes.grassland}</b></span>
+      <span>Desert <b>${country.geography.biomes.desert}</b></span>
+      <span>Tundra <b>${country.geography.biomes.tundra}</b></span>
+      <span>Alpine <b>${country.geography.biomes.alpine}</b></span>
     </div>
     <p class="country-footnote">Government, capital, currency and economic details will emerge as the civilization develops. They are intentionally not pre-assigned.</p>`;
   countryListNode?.querySelectorAll<HTMLButtonElement>('.country-choice').forEach((button) => {
@@ -124,8 +137,8 @@ function random(seed: number): () => number {
 
 function createPlanetTexture(worldData: PlanetWorld): THREE.CanvasTexture {
   const canvas = document.createElement('canvas');
-  canvas.width = 2048;
-  canvas.height = 1024;
+  canvas.width = 3072;
+  canvas.height = 1536;
   const context = canvas.getContext('2d');
   if (!context) throw new Error('Canvas texture is unavailable.');
 
@@ -136,7 +149,16 @@ function createPlanetTexture(worldData: PlanetWorld): THREE.CanvasTexture {
   if (!mapContext) throw new Error('Geography map is unavailable.');
 
   const image = mapContext.createImageData(worldData.width, worldData.height);
-  const colors = worldData.countries.map((country) => {
+  const biomeColors: Record<Biome, [number, number, number]> = {
+    ocean: [12, 42, 68],
+    coast: [177, 164, 119],
+    grassland: [105, 132, 76],
+    forest: [42, 91, 62],
+    desert: [181, 143, 83],
+    tundra: [142, 157, 153],
+    alpine: [111, 122, 124]
+  };
+  const countryTints = worldData.countries.map((country) => {
     const value = Number.parseInt(country.color.slice(1), 16);
     return [(value >> 16) & 255, (value >> 8) & 255, value & 255];
   });
@@ -146,31 +168,35 @@ function createPlanetTexture(worldData: PlanetWorld): THREE.CanvasTexture {
       const index = y * worldData.width + x;
       const cell = worldData.cells[index];
       const offset = index * 4;
-      if (cell.countryIndex < 0) {
-        const latitude = Math.abs((y / worldData.height) * 2 - 1);
-        const depth = Math.round(8 + (1 - latitude) * 13);
-        image.data[offset] = 12;
-        image.data[offset + 1] = 37 + depth;
-        image.data[offset + 2] = 58 + depth * 2;
-        image.data[offset + 3] = 255;
-        continue;
-      }
-
-      const base = colors[cell.countryIndex];
-      let shade = 0;
-      if (cell.terrain === 'coast') shade = 18;
-      else if (cell.terrain === 'highlands') shade = -12;
-      else if (cell.terrain === 'mountains') shade = 26;
-
       const rightX = (x + 1) % worldData.width;
       const right = worldData.cells[y * worldData.width + rightX];
       const down = y + 1 < worldData.height ? worldData.cells[(y + 1) * worldData.width + x] : null;
-      const border = (right.countryIndex >= 0 && right.countryIndex !== cell.countryIndex)
-        || (down !== null && down.countryIndex >= 0 && down.countryIndex !== cell.countryIndex);
-      const borderShade = border ? 0.42 : 1;
-      image.data[offset] = Math.max(0, Math.min(255, (base[0] + shade) * borderShade));
-      image.data[offset + 1] = Math.max(0, Math.min(255, (base[1] + shade) * borderShade));
-      image.data[offset + 2] = Math.max(0, Math.min(255, (base[2] + shade) * borderShade));
+      const left = worldData.cells[y * worldData.width + (x === 0 ? worldData.width - 1 : x - 1)];
+      const up = y > 0 ? worldData.cells[(y - 1) * worldData.width + x] : cell;
+      const border = cell.countryIndex >= 0 && (
+        (right.countryIndex >= 0 && right.countryIndex !== cell.countryIndex)
+        || (down !== null && down.countryIndex >= 0 && down.countryIndex !== cell.countryIndex)
+      );
+      if (cell.countryIndex < 0) {
+        const depth = Math.round(8 + cell.elevation * 13);
+        image.data[offset] = 8;
+        image.data[offset + 1] = 31 + depth;
+        image.data[offset + 2] = 55 + depth * 2;
+        image.data[offset + 3] = 255;
+        continue;
+      }
+      const base = biomeColors[cell.terrain === 'coast' ? 'coast' : cell.biome];
+      const tint = countryTints[cell.countryIndex];
+      const slopeShade = Math.max(0.72, Math.min(1.28, 1 + (left.elevation - right.elevation) * 0.85 + (up.elevation - (down?.elevation ?? cell.elevation)) * 0.85));
+      const altitudeShade = 0.84 + cell.elevation * 0.30;
+      const countryMix = 0.13;
+      const borderShade = border ? 0.48 : 1;
+      const riverColor: [number, number, number] = [48, 133, 180];
+      for (let channel = 0; channel < 3; channel++) {
+        const natural = base[channel] * (1 - countryMix) + tint[channel] * countryMix;
+        const shaded = natural * slopeShade * altitudeShade * borderShade;
+        image.data[offset + channel] = cell.river ? riverColor[channel] : Math.max(0, Math.min(255, shaded));
+      }
       image.data[offset + 3] = 255;
     }
   }
@@ -181,15 +207,15 @@ function createPlanetTexture(worldData: PlanetWorld): THREE.CanvasTexture {
 
   // Deterministic terrain micro-relief becomes visible as the camera zooms closer.
   const detailRand = random(worldData.seed + 1907);
-  for (let i = 0; i < 14500; i++) {
+  for (let i = 0; i < 32000; i++) {
     const px = detailRand() * canvas.width;
     const py = detailRand() * canvas.height;
     const cellX = Math.min(worldData.width - 1, Math.floor(px / canvas.width * worldData.width));
     const cellY = Math.min(worldData.height - 1, Math.floor(py / canvas.height * worldData.height));
     const cell = worldData.cells[cellY * worldData.width + cellX];
     if (!cell || cell.countryIndex < 0) continue;
-    const size = 0.5 + detailRand() * (cell.terrain === 'mountains' ? 3.8 : 2.2);
-    const alpha = 0.025 + detailRand() * (cell.terrain === 'mountains' ? 0.12 : 0.065);
+    const size = 0.45 + detailRand() * (cell.terrain === 'mountains' ? 4.8 : 2.8);
+    const alpha = 0.035 + detailRand() * (cell.terrain === 'mountains' ? 0.16 : 0.085);
     context.beginPath();
     context.ellipse(px, py, size * (1.2 + detailRand()), size * 0.45, detailRand() * Math.PI, 0, Math.PI * 2);
     context.fillStyle = cell.terrain === 'mountains'
@@ -220,7 +246,26 @@ function createPlanetTexture(worldData: PlanetWorld): THREE.CanvasTexture {
 const planetGroup = new THREE.Group();
 scene.add(planetGroup);
 
-const planetGeometry = new THREE.SphereGeometry(1.72, 192, 128);
+const planetGeometry = new THREE.SphereGeometry(1.72, 540, 270);
+const positions = planetGeometry.getAttribute('position');
+const uvs = planetGeometry.getAttribute('uv');
+for (let vertex = 0; vertex < positions.count; vertex++) {
+  const u = uvs.getX(vertex);
+  const v = uvs.getY(vertex);
+  const gx = Math.min(world.width - 1, Math.max(0, Math.floor(u * world.width)));
+  const gy = Math.min(world.height - 1, Math.max(0, Math.floor((1 - v) * world.height)));
+  const cell = world.cells[gy * world.width + gx];
+  const nx = positions.getX(vertex);
+  const ny = positions.getY(vertex);
+  const nz = positions.getZ(vertex);
+  const length = Math.hypot(nx, ny, nz) || 1;
+  const relief = cell.countryIndex < 0 ? 0 : 0.008 + cell.elevation * 0.105;
+  const fineNoise = cell.countryIndex < 0 ? 0 : (Math.sin(u * 920 + world.seed) * Math.sin(v * 670 + world.seed * 0.31)) * 0.0018;
+  const radius = 1.72 + relief + fineNoise;
+  positions.setXYZ(vertex, nx / length * radius, ny / length * radius, nz / length * radius);
+}
+planetGeometry.computeVertexNormals();
+planetGeometry.computeBoundingSphere();
 const planetMaterial = new THREE.MeshStandardMaterial({
   map: createPlanetTexture(world),
   roughness: 0.92,
@@ -328,7 +373,7 @@ renderer.domElement.addEventListener('pointerup', stopDrag);
 renderer.domElement.addEventListener('pointercancel', () => { dragging = false; });
 renderer.domElement.addEventListener('wheel', (event) => {
   event.preventDefault();
-  cameraDistance = THREE.MathUtils.clamp(cameraDistance + event.deltaY * 0.003, 2.15, 9.5);
+  cameraDistance = THREE.MathUtils.clamp(cameraDistance + event.deltaY * 0.0025, 1.94, 9.5);
 }, { passive: false });
 
 let touchDistance = 0;
@@ -344,7 +389,7 @@ renderer.domElement.addEventListener('touchmove', (event) => {
   const a = event.touches[0];
   const b = event.touches[1];
   const nextDistance = Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY);
-  cameraDistance = THREE.MathUtils.clamp(cameraDistance + (touchDistance - nextDistance) * 0.012, 2.15, 9.5);
+  cameraDistance = THREE.MathUtils.clamp(cameraDistance + (touchDistance - nextDistance) * 0.010, 1.94, 9.5);
   touchDistance = nextDistance;
 }, { passive: true });
 renderer.domElement.addEventListener('touchend', () => { touchDistance = 0; }, { passive: true });
@@ -426,7 +471,7 @@ function animate(now: number): void {
   lastWallClockMs = Date.now();
   simulationMinutes += elapsedSeconds;
   renderClock();
-  const zoomLabel = cameraDistance < 3.1 ? 'LOCAL VIEW · SURFACE DETAIL' : cameraDistance < 4.7 ? 'REGIONAL VIEW · TERRAIN DETAIL' : cameraDistance < 6.5 ? 'CONTINENT VIEW · COUNTRY DETAIL' : 'PLANET VIEW · GLOBAL DETAIL';
+  const zoomLabel = cameraDistance < 2.45 ? 'CLOSE VIEW · ELEVATION & RIVERS' : cameraDistance < 3.4 ? 'LOCAL VIEW · TERRAIN & BIOMES' : cameraDistance < 4.8 ? 'REGIONAL VIEW · COUNTRY GEOGRAPHY' : cameraDistance < 6.5 ? 'CONTINENT VIEW · NATIONAL BORDERS' : 'PLANET VIEW · GLOBAL DETAIL';
   if (zoomLevelNode && zoomLevelNode.textContent !== zoomLabel) zoomLevelNode.textContent = zoomLabel;
   // Faster damping reduces the lag between pointer movement and globe rotation.
   const rotationFollow = dragging ? 0.42 : 0.16;
