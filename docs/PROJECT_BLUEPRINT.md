@@ -34,7 +34,9 @@ The clock must support pause, resume, save/load and controlled speed changes. El
 
 The initial atlas generates a reproducible fictional geography and 100 distinct country territories. Each country begins with exactly 1,000,000 inhabitants. Country identities and colours are stable for a given world-generation version and seed.
 
-The planet will progressively gain rivers, climate, biomes, natural resources and ecosystems. Geography and resource distribution should influence where settlements emerge and what they can produce.
+The first detailed geography layer now assigns each map cell elevation, moisture, temperature and a biome, and traces river paths from high interior terrain toward lower ground. The globe renderer uses a higher-resolution geographic grid, natural terrain shading, country boundary overlays and elevation-displaced 3D geometry. Country information profiles report spherical surface share, share of global land, terrain distribution, coastline cells, river cells, highest relief and biome counts.
+
+The next geography stages add province-level subdivision, connected watersheds, lake basins, detailed climate zones, natural resources and ecosystems. Geography and resource distribution should influence where settlements emerge and what they can produce.
 
 ## 4. Individuals and minds
 
