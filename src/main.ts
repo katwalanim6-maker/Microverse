@@ -618,7 +618,7 @@ function resize(): void {
   renderer.setSize(width, height, false);
 }
 const resizeObserver = new ResizeObserver(resize);
-resizeObserver.observe(mount);
+resizeObserver.observe(mountElement);
 resize();
 
 const CLOCK_STORAGE_KEY = 'microverse-clock-v1';
