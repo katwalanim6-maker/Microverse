@@ -94,5 +94,5 @@ Persist versioned world snapshots and event/checkpoint data. A save should inclu
 
 Every milestone follows: define → design → build → test → integrate → simulate → optimize → freeze.
 
-- Globe interaction uses Pointer Events with a single-finger/mouse direct-rotation path and a separate two-pointer pinch-zoom path; multi-touch cannot accidentally rotate the globe. Both rotation axes are unbounded for full 360-degree movement.
-- A visible sun, orbiting moon and star field provide a simulated day/night cycle synchronized to world time (one orbit per 1,440 simulation minutes / 24 real minutes).
+- Globe interaction uses Pointer Events with a single-finger/mouse rotation path and a separate two-pointer pinch-zoom path; multi-touch cannot accidentally rotate the globe. Rotation sensitivity is reduced overall and scales down further at close zoom, while both axes remain unrestricted.
+- The sun, moon and star field occupy fixed world-space positions independent of user camera movement and manual globe rotation. The planet rotates axially beneath the fixed sun, creating one day/night cycle per 1,440 simulation minutes / 24 real minutes. Directional sunlight therefore illuminates the planet from a stable spatial direction rather than following the camera.
