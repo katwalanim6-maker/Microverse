@@ -98,8 +98,8 @@ const scene = new THREE.Scene();
 scene.background = new THREE.Color('#080a12');
 
 // Wide framing shows the Sun, Earth and Moon together at the starting zoom.
-const camera = new THREE.PerspectiveCamera(72, 1, 0.1, 220);
-camera.position.set(0, 0, 28);
+const camera = new THREE.PerspectiveCamera(58, 1, 0.1, 260);
+camera.position.set(0, 0, 11);
 // The observer camera orbits Earth; dragging never rotates the planet or celestial bodies.
 let cameraAzimuth = 0;
 let cameraPolar = Math.PI / 2;
@@ -248,7 +248,7 @@ const earthOrbit = new THREE.Group();
 scene.add(earthOrbit);
 
 // Slightly wider system spacing keeps the Sun clearly separated from Earth.
-const earthOrbitRadius = 8.8;
+const earthOrbitRadius = 10.5;
 const planetGroup = new THREE.Group();
 planetGroup.position.set(earthOrbitRadius, 0, 0);
 earthOrbit.add(planetGroup);
@@ -284,7 +284,9 @@ function sampleSurface(u: number, v: number): { elevation: number; land: number 
   };
 }
 
-const planetGeometry = new THREE.SphereGeometry(1.72, 720, 360);
+const PLANET_RADIUS = 2.6;
+const ATMOSPHERE_RADIUS = 2.72;
+const planetGeometry = new THREE.SphereGeometry(PLANET_RADIUS, 720, 360);
 const positions = planetGeometry.getAttribute('position');
 const uvs = planetGeometry.getAttribute('uv');
 for (let vertex = 0; vertex < positions.count; vertex++) {
@@ -301,7 +303,7 @@ for (let vertex = 0; vertex < positions.count; vertex++) {
   const fineDetail = Math.sin(u * 410 + world.seed * 0.003) * Math.sin(v * 290 + world.seed * 0.004);
   const landHeight = 0.028 + sample.elevation * 0.235 + broadDetail * 0.006 + fineDetail * 0.0018;
   const oceanDepth = -0.018 + sample.elevation * 0.018;
-  const radius = 1.72 + oceanDepth * (1 - sample.land) + landHeight * sample.land;
+  const radius = PLANET_RADIUS + oceanDepth * (1 - sample.land) + landHeight * sample.land;
   positions.setXYZ(vertex, nx / length * radius, ny / length * radius, nz / length * radius);
 }
 planetGeometry.computeVertexNormals();
@@ -358,7 +360,7 @@ function createCountryBorderOverlay(worldData: PlanetWorld): THREE.LineSegments 
     const sample = sampleSurface(u, v);
     const phi = u * Math.PI * 2;
     const theta = (1 - v) * Math.PI;
-    const radius = 1.72 + 0.035 + sample.elevation * 0.235;
+    const radius = PLANET_RADIUS + 0.035 + sample.elevation * 0.235;
     return new THREE.Vector3(
       -Math.cos(phi) * Math.sin(theta) * radius,
       Math.cos(theta) * radius,
@@ -430,7 +432,7 @@ const countryBorders = createCountryBorderOverlay(world);
 planetSpin.add(countryBorders);
 
 const atmosphere = new THREE.Mesh(
-  new THREE.SphereGeometry(1.79, 96, 64),
+  new THREE.SphereGeometry(ATMOSPHERE_RADIUS, 128, 96),
   new THREE.MeshBasicMaterial({ color: 0x688cff, transparent: true, opacity: 0.10, side: THREE.BackSide })
 );
 planetSpin.add(atmosphere);
@@ -484,7 +486,7 @@ const activePointers = new Map<number, { x: number; y: number }>();
 const pointerStarts = new Map<number, { x: number; y: number }>();
 let pinchDistance = 0;
 let clickCandidate = false;
-let cameraDistance = 28;
+let cameraDistance = 11;
 
 function distanceBetweenPointers(): number {
   const points = [...activePointers.values()];
@@ -517,8 +519,8 @@ renderer.domElement.addEventListener('pointermove', (event) => {
     if (pinchDistance > 0 && nextDistance > 0) {
       cameraDistance = THREE.MathUtils.clamp(
         cameraDistance + (pinchDistance - nextDistance) * 0.010,
-        2.05,
-        90
+        3.05,
+        120
       );
     }
     pinchDistance = nextDistance;
@@ -599,7 +601,7 @@ renderer.domElement.addEventListener('pointerup', finishPointer);
 renderer.domElement.addEventListener('pointercancel', finishPointer);
 renderer.domElement.addEventListener('wheel', (event) => {
   event.preventDefault();
-  cameraDistance = THREE.MathUtils.clamp(cameraDistance + event.deltaY * 0.0025, 2.05, 90);
+  cameraDistance = THREE.MathUtils.clamp(cameraDistance + event.deltaY * 0.0025, 3.05, 120);
 }, { passive: false });
 
 function resize(): void {
@@ -690,7 +692,7 @@ function animate(now: number): void {
   lastWallClockMs = Date.now();
   simulationMinutes += elapsedSeconds * SIMULATION_MINUTES_PER_REAL_SECOND;
   renderClock();
-  const zoomLabel = cameraDistance < 2.45 ? 'CLOSE VIEW · ELEVATION & RIVERS' : cameraDistance < 3.4 ? 'LOCAL VIEW · TERRAIN & BIOMES' : cameraDistance < 4.8 ? 'REGIONAL VIEW · COUNTRY GEOGRAPHY' : cameraDistance < 6.5 ? 'CONTINENT VIEW · NATIONAL BORDERS' : cameraDistance > 24 ? 'SYSTEM VIEW · SUN & MOON' : 'PLANET VIEW · GLOBAL DETAIL';
+  const zoomLabel = cameraDistance < 3.7 ? 'CLOSE VIEW · ELEVATION & RIVERS' : cameraDistance < 5.1 ? 'LOCAL VIEW · TERRAIN & BIOMES' : cameraDistance < 7.2 ? 'REGIONAL VIEW · COUNTRY GEOGRAPHY' : cameraDistance < 9.7 ? 'CONTINENT VIEW · NATIONAL BORDERS' : cameraDistance > 24 ? 'SYSTEM VIEW · SUN & MOON' : 'PLANET VIEW · GLOBAL DETAIL';
   if (zoomLevelNode && zoomLevelNode.textContent !== zoomLabel) zoomLevelNode.textContent = zoomLabel;
   // Orbital periods follow the world's calendar:
   // At the current speed, one real second advances 30 simulated minutes.
