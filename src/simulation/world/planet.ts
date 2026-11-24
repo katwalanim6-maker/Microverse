@@ -3,8 +3,8 @@ export const INITIAL_POPULATION_PER_COUNTRY = 1_000_000;
 export const COUNTRY_COUNT = 100;
 export const INITIAL_POPULATION = COUNTRY_COUNT * INITIAL_POPULATION_PER_COUNTRY;
 export const TARGET_LAND_PERCENT = 73;
-export const MAP_WIDTH = 1620;
-export const MAP_HEIGHT = 810;
+export const MAP_WIDTH = 3240;
+export const MAP_HEIGHT = 1620;
 const MAP_SCALE = MAP_WIDTH / 1620;
 
 export type Terrain = 'ocean' | 'coast' | 'plains' | 'highlands' | 'mountains';
