@@ -812,6 +812,8 @@ window.addEventListener('beforeunload', () => {
   planetMaterial.dispose();
   countryBorders.geometry.dispose();
   (countryBorders.material as THREE.Material).dispose();
+  senpePopulationLayer.geometry.dispose();
+  (senpePopulationLayer.material as THREE.Material).dispose();
   starGeometry.dispose();
 });
 }
