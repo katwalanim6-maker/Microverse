@@ -205,7 +205,7 @@ function landScore(x: number, y: number, masses: Landmass[], seed: number): numb
     + (smoothNoise(x / (15.75 * MAP_SCALE), y / (15.75 * MAP_SCALE), seed + 177) - 0.5) * 0.045;
 }
 
-function selectCountrySeeds(landIndices: number[], rand: () => number): CountrySeed[] {
+function selectCountrySeeds(landIndices: ArrayLike<number>, rand: () => number): CountrySeed[] {
   if (landIndices.length < COUNTRY_COUNT) {
     throw new Error('The generated planet does not contain enough land for 100 countries.');
   }
@@ -273,7 +273,8 @@ export function generatePlanetWorld(seed = WORLD_SEED): PlanetWorld {
   orderKeys.sort();
   const rawLand = new Uint8Array(orderKeys.length);
   const targetSurfaceWeight = totalSurfaceWeight * TARGET_LAND_PERCENT / 100;
-  const landIndices: number[] = [];
+  const landIndexBuffer = new Int32Array(orderKeys.length);
+  let landCount = 0;
   let selectedSurfaceWeight = 0;
   let lastLandIndex = -1;
   for (let rank = orderKeys.length - 1; rank >= 0; rank--) {
@@ -282,7 +283,7 @@ export function generatePlanetWorld(seed = WORLD_SEED): PlanetWorld {
     const y = Math.floor(index / MAP_WIDTH);
     const surfaceWeight = Math.cos((0.5 - y / MAP_HEIGHT) * Math.PI);
     rawLand[index] = 1;
-    landIndices.push(index);
+    landIndexBuffer[landCount++] = index;
     selectedSurfaceWeight += surfaceWeight;
     lastLandIndex = index;
   }
@@ -296,34 +297,35 @@ export function generatePlanetWorld(seed = WORLD_SEED): PlanetWorld {
     const withoutLastError = Math.abs(selectedSurfaceWeight - lastSurfaceWeight - targetSurfaceWeight);
     if (withoutLastError < withLastError) {
       rawLand[lastLandIndex] = 0;
-      landIndices.pop();
+      landCount--;
       selectedSurfaceWeight -= lastSurfaceWeight;
     }
   }
 
+  const landIndices = landIndexBuffer.subarray(0, landCount);
   const countrySeeds = selectCountrySeeds(landIndices, rand);
   const cells: WorldCell[] = new Array(orderKeys.length);
   const countryLandCounts = new Array(COUNTRY_COUNT).fill(0) as number[];
   const countryWeights = new Array(COUNTRY_COUNT).fill(0) as number[];
   const countrySurfaceWeights = new Array(COUNTRY_COUNT).fill(0) as number[];
   const landThreshold = scores[landIndices[landIndices.length - 1]];
-  const cellWeights = new Float64Array(orderKeys.length);
+  const cellWeights = new Float32Array(orderKeys.length);
   // Build an explicit owner lookup for the 100 seed cells. Seed ownership
   // takes priority over distance calculations, guaranteeing every country
   // starts with at least one land cell.
   const countryOwners = new Int16Array(orderKeys.length);
   countryOwners.fill(-1);
-  const seedOwnerByCell = new Int16Array(orderKeys.length);
-  seedOwnerByCell.fill(-1);
+  const seedOwnerByCell = new Map<number, number>();
   for (let country = 0; country < countrySeeds.length; country++) {
     const seedIndex = countrySeeds[country].y * MAP_WIDTH + countrySeeds[country].x;
     if (!rawLand[seedIndex]) {
       throw new Error(`Country ${country + 1} seed ${seedIndex} is not land.`);
     }
-    if (seedOwnerByCell[seedIndex] !== -1) {
-      throw new Error(`Countries ${seedOwnerByCell[seedIndex] + 1} and ${country + 1} share seed cell ${seedIndex}.`);
+    const existingSeedOwner = seedOwnerByCell.get(seedIndex);
+    if (existingSeedOwner !== undefined) {
+      throw new Error(`Countries ${existingSeedOwner + 1} and ${country + 1} share seed cell ${seedIndex}.`);
     }
-    seedOwnerByCell[seedIndex] = country;
+    seedOwnerByCell.set(seedIndex, country);
   }
   // Build a coarse Voronoi ownership atlas once, then expand it over the
   // high-resolution geography. This avoids comparing ~3.8 million land cells
@@ -353,7 +355,7 @@ export function generatePlanetWorld(seed = WORLD_SEED): PlanetWorld {
     }
   }
   for (const index of landIndices) {
-    const pinnedOwner = seedOwnerByCell[index];
+    const pinnedOwner = seedOwnerByCell.get(index) ?? -1;
     if (pinnedOwner !== -1) {
       countryOwners[index] = pinnedOwner;
       continue;
