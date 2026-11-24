@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { generatePlanetWorld, getWorldSummary, type Biome, type PlanetWorld } from './simulation/world/planet';
+import { generatePlanetWorld, getWorldSummary, SPECIES_NAME, type Biome, type PlanetWorld } from './simulation/world/planet';
 import './style.css';
 
 const mount = document.querySelector<HTMLDivElement>('#planet-canvas');
@@ -42,7 +42,7 @@ function showCountry(country: PlanetWorld['countries'][number]): void {
   countryDetailNode.innerHTML = `
     <div class="country-title-row"><span class="country-swatch" style="--country-color:${country.color}"></span><div><p class="eyebrow">COUNTRY PROFILE // ${country.id.toUpperCase()}</p><h3>${country.name}</h3><span class="country-status">FOUNDATION STATUS: ${country.status.toUpperCase()}</span></div></div>
     <div class="country-stat-grid">
-      <div><small>POPULATION</small><strong>${country.population.toLocaleString('en-US')}</strong></div>
+      <div><small>${SPECIES_NAME.toUpperCase()} POPULATION</small><strong>${country.population.toLocaleString('en-US')}</strong></div>
       <div><small>LAND CELLS</small><strong>${country.landCells.toLocaleString('en-US')}</strong></div>
       <div><small>PLANET SURFACE</small><strong>${landShare.toFixed(2)}%</strong></div>
       <div><small>SHARE OF LAND</small><strong>${country.geography.landSharePercent.toFixed(2)}%</strong></div>
@@ -83,7 +83,7 @@ function renderCountryList(filter = ''): void {
   const normalized = filter.trim().toLocaleLowerCase();
   const matches = world.countries.filter((country) => country.name.toLocaleLowerCase().includes(normalized));
   countryListNode.innerHTML = matches.map((country) =>
-    `<button class="country-choice" type="button" data-country-id="${country.id}"><span class="country-swatch" style="--country-color:${country.color}"></span><span>${country.name}</span><small>${country.population.toLocaleString('en-US')}</small></button>`
+    `<button class="country-choice" type="button" data-country-id="${country.id}"><span class="country-swatch" style="--country-color:${country.color}"></span><span>${country.name}</span><small>${country.population.toLocaleString('en-US')} ${SPECIES_NAME}</small></button>`
   ).join('');
   countryListNode.querySelectorAll<HTMLButtonElement>('.country-choice').forEach((button) => {
     button.addEventListener('click', () => {
@@ -422,6 +422,63 @@ function createCountryBorderOverlay(worldData: PlanetWorld): THREE.LineSegments 
   });
   return new THREE.LineSegments(geometry, material);
 }
+function createSenpePopulationLayer(worldData: PlanetWorld): THREE.Points {
+  // 60,000 visible markers are a lightweight visual sample of the exact
+  // 100-million population. Population itself remains stored per map cell.
+  const markerCount = 60000;
+  const positions = new Float32Array(markerCount * 3);
+  const populationStep = worldData.totalPopulation / markerCount;
+  const markerRandom = random(worldData.seed + 39017);
+  let cellIndex = 0;
+  let cumulativePopulation = 0;
+
+  for (let marker = 0; marker < markerCount; marker++) {
+    const targetPopulationRank = (marker + 0.5) * populationStep;
+    while (
+      cellIndex < worldData.cells.length - 1
+      && cumulativePopulation + worldData.cells[cellIndex].population <= targetPopulationRank
+    ) {
+      cumulativePopulation += worldData.cells[cellIndex].population;
+      cellIndex++;
+    }
+
+    const cell = worldData.cells[cellIndex];
+    if (!cell || cell.countryIndex < 0 || cell.population <= 0) {
+      throw new Error(`Senpe distribution reached an unpopulated map cell at index ${cellIndex}.`);
+    }
+
+    // Keep each marker inside its assigned geography cell while avoiding a
+    // rigid grid appearance. Markers are sampled in proportion to population.
+    const x = cellIndex % worldData.width;
+    const y = Math.floor(cellIndex / worldData.width);
+    const u = (x + 0.5 + (markerRandom() - 0.5) * 0.92) / worldData.width;
+    const v = 1 - (y + 0.5 + (markerRandom() - 0.5) * 0.92) / worldData.height;
+    const surface = sampleSurface(u, v);
+    const phi = u * Math.PI * 2;
+    const theta = (1 - v) * Math.PI;
+    const radius = PLANET_RADIUS + 0.035 + surface.elevation * 0.235 + 0.014;
+    const offset = marker * 3;
+    positions[offset] = -Math.cos(phi) * Math.sin(theta) * radius;
+    positions[offset + 1] = Math.cos(theta) * radius;
+    positions[offset + 2] = Math.sin(phi) * Math.sin(theta) * radius;
+  }
+
+  const geometry = new THREE.BufferGeometry();
+  geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+  const material = new THREE.PointsMaterial({
+    color: 0x9affd2,
+    size: 0.018,
+    transparent: true,
+    opacity: 0.82,
+    sizeAttenuation: true,
+    depthWrite: false
+  });
+  const populationLayer = new THREE.Points(geometry, material);
+  populationLayer.name = 'SENPE_POPULATION_REPRESENTATION';
+  populationLayer.renderOrder = 2;
+  return populationLayer;
+}
+
 const planetMaterial = new THREE.MeshStandardMaterial({
   map: createPlanetTexture(world),
   roughness: 0.92,
@@ -431,6 +488,8 @@ const planet = new THREE.Mesh(planetGeometry, planetMaterial);
 planetSpin.add(planet);
 const countryBorders = createCountryBorderOverlay(world);
 planetSpin.add(countryBorders);
+const senpePopulationLayer = createSenpePopulationLayer(world);
+planetSpin.add(senpePopulationLayer);
 
 const atmosphere = new THREE.Mesh(
   new THREE.SphereGeometry(ATMOSPHERE_RADIUS, 128, 96),
@@ -571,6 +630,7 @@ function selectCountryAtPointer(clientX: number, clientY: number): void {
     `${latitude.toFixed(3)}° ${latitude >= 0 ? 'N' : 'S'} · ${Math.abs(longitude).toFixed(3)}° ${longitude >= 0 ? 'E' : 'W'}`,
     country ? country.name : 'Open ocean',
     `${terrainName} · Elevation ${Math.round(cell.elevation * 8848).toLocaleString('en-US')} m`,
+    `${SPECIES_NAME} in this map cell: ${cell.population.toLocaleString('en-US')}`,
     `Biome: ${cell.biome}${cell.river ? ' · River' : ''}${cell.volcanic ? ' · Volcanic region' : ''}`
   ].join('  |  ');
   if (locationNode) {
