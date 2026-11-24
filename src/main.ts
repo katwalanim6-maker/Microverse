@@ -731,7 +731,7 @@ senpePopulationPanel.innerHTML = `
     <div><small>CUMULATIVE DEATHS</small><strong data-senpe-deaths>0</strong></div>
     <div><small>PROCESSED YEARS</small><strong data-senpe-year>0</strong></div>
   </div>
-  <p class="senpe-life-note">Births and natural deaths are calculated yearly. Age 35 is the natural lifespan limit. Births use a replacement-level baseline of one birth per 29 mature Senpe per year.</p>`;
+  <p class="senpe-life-note">Births and natural deaths are calculated yearly. Age 35 is the natural lifespan limit. Births use a replacement-level baseline of one birth per 28 mature Senpe per year.</p>`;
 if (summaryNode?.parentElement) summaryNode.insertAdjacentElement('afterend', senpePopulationPanel);
 
 function syncSenpePopulationToWorld(): void {
@@ -775,6 +775,7 @@ function renderSenpePopulation(): void {
     if (node) node.textContent = value.toLocaleString('en-US');
   }
   if (summaryNode) summaryNode.textContent = getWorldSummary(world);
+  renderCountryList(countrySearchNode?.value ?? '');
 }
 
 function advanceSenpeToCurrentYear(): void {
