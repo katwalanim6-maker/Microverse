@@ -1,4 +1,5 @@
 export const WORLD_SEED = 4182026;
+export const SPECIES_NAME = 'Senpe';
 export const INITIAL_POPULATION_PER_COUNTRY = 1_000_000;
 export const COUNTRY_COUNT = 100;
 export const INITIAL_POPULATION = COUNTRY_COUNT * INITIAL_POPULATION_PER_COUNTRY;
@@ -553,5 +554,5 @@ export function generatePlanetWorld(seed = WORLD_SEED): PlanetWorld {
 }
 
 export function getWorldSummary(world: PlanetWorld): string {
-  return `${world.countries.length} COUNTRIES · ${world.totalPopulation.toLocaleString('en-US')} INHABITANTS · ${world.landPercent.toFixed(0)}% LAND`;
+  return `${world.countries.length} COUNTRIES · ${world.totalPopulation.toLocaleString('en-US')} SENPE · ${world.landPercent.toFixed(0)}% LAND`;
 }
