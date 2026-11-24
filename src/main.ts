@@ -539,10 +539,11 @@ renderer.domElement.addEventListener('pointermove', (event) => {
   // Dragging moves the observer around Earth. The planet, Sun, Moon and stars
   // remain in their own world-space coordinate systems.
   const orbitSensitivity = 0.0052;
-  cameraAzimuth += deltaX * orbitSensitivity;
-  // Allow continuous vertical orbit through both poles for a full 360° observer orbit.
-  // The spherical camera offset remains continuous as polar crosses 0 and PI.
-  cameraPolar -= deltaY * orbitSensitivity;
+  // Horizontal dragging follows the finger and wraps cleanly through 360 degrees.
+  cameraAzimuth = (cameraAzimuth + deltaX * orbitSensitivity) % (Math.PI * 2);
+  // Vertical dragging follows the finger too. Keep the angle unbounded so the
+  // observer can continue over either pole instead of hitting an artificial stop.
+  cameraPolar += deltaY * orbitSensitivity;
 });
 
 function selectCountryAtPointer(clientX: number, clientY: number): void {
