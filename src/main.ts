@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { generatePlanetWorld, getWorldSummary, SPECIES_NAME, type Biome, type PlanetWorld } from './simulation/world/planet';
+import { advanceSenpePopulation, getSenpeCountryPopulations, getSenpePopulationStats, loadSenpePopulationState, saveSenpePopulationState, type SenpePopulationState } from './simulation/world/senpe';
 import './style.css';
 
 const mount = document.querySelector<HTMLDivElement>('#planet-canvas');
@@ -715,6 +716,78 @@ try {
   // A blocked or corrupt local save must never prevent the world from starting.
 }
 
+const senpeCountryStartingPopulations = world.countries.map((country) => country.population);
+let senpePopulationState: SenpePopulationState = loadSenpePopulationState(world.seed, senpeCountryStartingPopulations);
+const senpePopulationPanel = document.createElement('section');
+senpePopulationPanel.className = 'senpe-life-panel';
+senpePopulationPanel.setAttribute('aria-live', 'polite');
+senpePopulationPanel.innerHTML = `
+  <div class="senpe-life-heading"><div><span class="eyebrow">SPECIES DATABASE // SENPE</span><h2>Life cycle</h2></div><span class="senpe-life-age">MATURE AT 6 · LIFESPAN 35</span></div>
+  <div class="senpe-life-grid">
+    <div><small>TOTAL POPULATION</small><strong data-senpe-total>100,000,000</strong></div>
+    <div><small>YOUNG · AGES 0–5</small><strong data-senpe-young>—</strong></div>
+    <div><small>MATURE · AGES 6–34</small><strong data-senpe-mature>—</strong></div>
+    <div><small>CUMULATIVE BIRTHS</small><strong data-senpe-births>0</strong></div>
+    <div><small>CUMULATIVE DEATHS</small><strong data-senpe-deaths>0</strong></div>
+    <div><small>PROCESSED YEARS</small><strong data-senpe-year>0</strong></div>
+  </div>
+  <p class="senpe-life-note">Births and natural deaths are calculated yearly. Age 35 is the natural lifespan limit. Births use a replacement-level baseline of one birth per 29 mature Senpe per year.</p>`;
+if (summaryNode?.parentElement) summaryNode.insertAdjacentElement('afterend', senpePopulationPanel);
+
+function syncSenpePopulationToWorld(): void {
+  const countryPopulations = getSenpeCountryPopulations(senpePopulationState);
+  const oldTotals = new Array(world.countries.length).fill(0) as number[];
+  for (const cell of world.cells) if (cell.countryIndex >= 0) oldTotals[cell.countryIndex] += cell.population;
+  const ratios = countryPopulations.map((population, index) =>
+    oldTotals[index] > 0 ? population / oldTotals[index] : 0
+  );
+  const carries = new Array(world.countries.length).fill(0) as number[];
+  const allocated = new Array(world.countries.length).fill(0) as number[];
+  const lastCell = new Int32Array(world.countries.length);
+  lastCell.fill(-1);
+  for (let index = 0; index < world.cells.length; index++) {
+    const cell = world.cells[index];
+    if (cell.countryIndex < 0) continue;
+    const country = cell.countryIndex;
+    const scaled = cell.population * ratios[country] + carries[country];
+    const nextPopulation = Math.floor(scaled);
+    carries[country] = scaled - nextPopulation;
+    cell.population = nextPopulation;
+    allocated[country] += nextPopulation;
+    lastCell[country] = index;
+  }
+  for (let country = 0; country < world.countries.length; country++) {
+    const correctionCell = lastCell[country];
+    if (correctionCell >= 0) world.cells[correctionCell].population += countryPopulations[country] - allocated[country];
+    world.countries[country].population = countryPopulations[country];
+  }
+  world.totalPopulation = countryPopulations.reduce((sum, population) => sum + population, 0);
+}
+
+function renderSenpePopulation(): void {
+  const stats = getSenpePopulationStats(senpePopulationState);
+  const values: Record<string, number> = {
+    total: stats.total, young: stats.young, mature: stats.mature,
+    births: stats.births, deaths: stats.deaths, year: stats.year
+  };
+  for (const [key, value] of Object.entries(values)) {
+    const node = senpePopulationPanel.querySelector<HTMLElement>(`[data-senpe-${key}]`);
+    if (node) node.textContent = value.toLocaleString('en-US');
+  }
+  if (summaryNode) summaryNode.textContent = getWorldSummary(world);
+}
+
+function advanceSenpeToCurrentYear(): void {
+  const targetYear = Math.floor(simulationMinutes / (365 * 1440));
+  if (!advanceSenpePopulation(senpePopulationState, targetYear)) return;
+  syncSenpePopulationToWorld();
+  renderSenpePopulation();
+  saveSenpePopulationState(senpePopulationState);
+}
+
+advanceSenpeToCurrentYear();
+renderSenpePopulation();
+
 function renderClock(): void {
   const totalMinutes = Math.floor(simulationMinutes);
   const days = Math.floor(totalMinutes / 1440);
@@ -731,6 +804,7 @@ function renderClock(): void {
 }
 
 function saveClock(): void {
+  saveSenpePopulationState(senpePopulationState);
   try {
     localStorage.setItem(CLOCK_STORAGE_KEY, JSON.stringify({
       version: 3,
@@ -747,6 +821,7 @@ function catchUpWorldTime(): void {
   const now = Date.now();
   simulationMinutes += (Math.max(0, now - lastWallClockMs) / 1000) * SIMULATION_MINUTES_PER_REAL_SECOND;
   lastWallClockMs = now;
+  advanceSenpeToCurrentYear();
   renderClock();
   saveClock();
 }
@@ -763,6 +838,7 @@ function animate(now: number): void {
   const elapsedSeconds = Math.max(0, (Date.now() - lastWallClockMs) / 1000);
   lastWallClockMs = Date.now();
   simulationMinutes += elapsedSeconds * SIMULATION_MINUTES_PER_REAL_SECOND;
+  advanceSenpeToCurrentYear();
   cameraDistance += (cameraDistanceTarget - cameraDistance) * Math.min(1, elapsedSeconds * 9);
   renderClock();
   const zoomLabel = cameraDistance < 4.4 ? 'CITY SCALE · LOCAL TERRAIN' : cameraDistance < 6.5 ? 'REGIONAL VIEW · TERRAIN & RIVERS' : cameraDistance < 9.5 ? 'COUNTRY VIEW · NATIONAL GEOGRAPHY' : cameraDistance < 15 ? 'CONTINENT VIEW · NATIONAL BORDERS' : cameraDistance > 40 ? 'SYSTEM VIEW · SUN & MOON' : 'PLANET VIEW · GLOBAL DETAIL';
