@@ -42,3 +42,5 @@
 - Benchmark 1080 × 540 and 1620 × 810 generation before changing the active grid.
 - Test the new clock against save/reload and phone background/foreground behavior.
 - Do not provision a worker or database until the architecture and recurring cost are reviewed.
+
+- Added a GitHub Actions workflow to run the TypeScript/Vite production build on pushes to the expansion branch and pull requests targeting main.
