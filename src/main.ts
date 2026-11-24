@@ -621,18 +621,19 @@ pageButtons.forEach((button) => button.addEventListener('click', () => setActive
 backToWorldButton?.addEventListener('click', () => setActivePage('world'));
 resize();
 
-const CLOCK_STORAGE_KEY = 'microverse-clock-v2';
+const CLOCK_STORAGE_KEY = 'microverse-clock-v3';
+const PREVIOUS_CLOCK_STORAGE_KEY = 'microverse-clock-v2';
 const LEGACY_CLOCK_STORAGE_KEY = 'microverse-clock-v1';
-const SIMULATION_MINUTES_PER_REAL_SECOND = 1440;
+const SIMULATION_MINUTES_PER_REAL_SECOND = 30;
 const nowAtStart = Date.now();
 let simulationMinutes = 0;
 let lastWallClockMs = nowAtStart;
 
 try {
-  const saved = localStorage.getItem(CLOCK_STORAGE_KEY) ?? localStorage.getItem(LEGACY_CLOCK_STORAGE_KEY);
+  const saved = localStorage.getItem(CLOCK_STORAGE_KEY) ?? localStorage.getItem(PREVIOUS_CLOCK_STORAGE_KEY) ?? localStorage.getItem(LEGACY_CLOCK_STORAGE_KEY);
   if (saved) {
     const parsed = JSON.parse(saved) as { version: number; seed: number; simulationMinutes: number; savedAt: number };
-    if ((parsed.version === 1 || parsed.version === 2) && parsed.seed === world.seed && Number.isFinite(parsed.simulationMinutes) && Number.isFinite(parsed.savedAt)) {
+    if ((parsed.version === 1 || parsed.version === 2 || parsed.version === 3) && parsed.seed === world.seed && Number.isFinite(parsed.simulationMinutes) && Number.isFinite(parsed.savedAt)) {
       simulationMinutes = parsed.simulationMinutes + (Math.max(0, nowAtStart - parsed.savedAt) / 1000) * SIMULATION_MINUTES_PER_REAL_SECOND;
     }
   }
@@ -658,7 +659,7 @@ function renderClock(): void {
 function saveClock(): void {
   try {
     localStorage.setItem(CLOCK_STORAGE_KEY, JSON.stringify({
-      version: 2,
+      version: 3,
       seed: world.seed,
       simulationMinutes: simulationMinutes + (Math.max(0, Date.now() - lastWallClockMs) / 1000) * SIMULATION_MINUTES_PER_REAL_SECOND,
       savedAt: Date.now()
@@ -692,7 +693,7 @@ function animate(now: number): void {
   const zoomLabel = cameraDistance < 2.45 ? 'CLOSE VIEW · ELEVATION & RIVERS' : cameraDistance < 3.4 ? 'LOCAL VIEW · TERRAIN & BIOMES' : cameraDistance < 4.8 ? 'REGIONAL VIEW · COUNTRY GEOGRAPHY' : cameraDistance < 6.5 ? 'CONTINENT VIEW · NATIONAL BORDERS' : cameraDistance > 24 ? 'SYSTEM VIEW · SUN & MOON' : 'PLANET VIEW · GLOBAL DETAIL';
   if (zoomLevelNode && zoomLevelNode.textContent !== zoomLabel) zoomLevelNode.textContent = zoomLabel;
   // Orbital periods follow the world's calendar:
-  // At the new speed, one real second advances exactly one 1,440-minute day.
+  // At the current speed, one real second advances 30 simulated minutes.
   // The Moon orbits once per 30 simulated days; Earth orbits the Sun once per 365 days.
   const dayAngle = (simulationMinutes / 1440) * Math.PI * 2;
   const monthAngle = (simulationMinutes / (30 * 1440)) * Math.PI * 2;
