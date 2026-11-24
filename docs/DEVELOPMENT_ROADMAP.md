@@ -99,3 +99,38 @@ The first playable/observable world should establish the planet as a real data m
 Each milestone must have acceptance criteria, automated checks where possible, a phone test, a saved checkpoint and a clear list of what is not yet implemented. Never overwrite the last known-good milestone without a recoverable version.
 
 Each module follows: define → design → build → test → integrate → simulate → optimize → freeze.
+
+
+## World Expansion 2.0 — scale and open-ended civilization
+
+This expansion extends the ten connected systems without replacing their foundations.
+
+### World scale and resolution
+- Preserve one authoritative spherical geography grid; renderer resolution and simulation resolution remain separate.
+- Benchmark a staged resolution ladder: 540 × 270 baseline, 1080 × 540, 1620 × 810, then 3240 × 1620 only after memory, generation-time and phone-render benchmarks pass.
+- Keep the 73% land target measured by spherical cell area, not raw pixel count.
+- Use typed arrays / compact cell fields and deterministic generation; avoid one heavyweight object per cell where practical.
+- Increase visual planet scale independently from map-cell resolution and retune camera clipping, zoom and celestial presentation as a single tested change.
+- Add higher-resolution texture/mesh sampling without creating one Three.js object per geography cell.
+
+### Open-ended lives and professions
+- Profession definitions are data-driven and extensible, not a closed enum of permitted jobs.
+- Support inventors, philosophers, scientists, astronauts, engineers, artists, trades, services and future occupations.
+- New occupations can emerge from discovered knowledge, tools, institutions, economic demand and social change.
+- People may change occupations, combine skills, found organizations and pursue unusual ambitions; the simulation must not guarantee that every person can do every job.
+
+### Political and historical change
+- Leaders, succession, institutions, diplomacy, treaties, independence, state mergers/splits and territorial changes are persistent world events.
+- Conflicts are represented as abstract, high-level simulation outcomes with political, demographic, economic and territorial consequences; no real-world tactical instruction is part of the simulator.
+- Every border change and leadership transition is recorded in the historical event log and can be inspected on a timeline.
+
+### Spacefaring expansion
+- Space development is gated by scientific knowledge, industrial capacity, institutions, resources and accumulated technology.
+- Add satellites, orbital infrastructure, spaceflight and eventual off-world settlements as later simulation layers.
+- Space locations use their own coordinate and environment model while remaining connected to the planetary economy and history.
+
+### Performance and persistence
+- Keep simulation logic independent from the Three.js viewer.
+- Use aggregate population cohorts plus selectively materialized individual records; do not instantiate 100 million full autonomous AI objects.
+- Persist versioned world snapshots, event history, simulation time and random seeds.
+- The target time rate is 1 real second = 30 simulated minutes; persistent cloud execution is a separate infrastructure milestone and is not provided by a browser tab alone.
