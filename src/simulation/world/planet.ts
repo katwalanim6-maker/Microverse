@@ -325,8 +325,33 @@ export function generatePlanetWorld(seed = WORLD_SEED): PlanetWorld {
     }
     seedOwnerByCell[seedIndex] = country;
   }
-  // Assign each land cell to its nearest seed, except seed cells which are
-  // pinned to their own country before the distance comparison.
+  // Build a coarse Voronoi ownership atlas once, then expand it over the
+  // high-resolution geography. This avoids comparing ~3.8 million land cells
+  // against all 100 seeds (hundreds of millions of distance checks).
+  // Seed cells are pinned below, so every country is guaranteed to own land.
+  const ownershipScale = 10;
+  const ownershipWidth = Math.ceil(MAP_WIDTH / ownershipScale);
+  const ownershipHeight = Math.ceil(MAP_HEIGHT / ownershipScale);
+  const coarseOwners = new Int16Array(ownershipWidth * ownershipHeight);
+  for (let coarseY = 0; coarseY < ownershipHeight; coarseY++) {
+    const y = Math.min(MAP_HEIGHT - 1, coarseY * ownershipScale + ownershipScale / 2);
+    for (let coarseX = 0; coarseX < ownershipWidth; coarseX++) {
+      const x = Math.min(MAP_WIDTH - 1, coarseX * ownershipScale + ownershipScale / 2);
+      let nearestCountry = -1;
+      let nearestDistance = Number.POSITIVE_INFINITY;
+      for (let country = 0; country < countrySeeds.length; country++) {
+        const dx = wrapDistanceX(x, countrySeeds[country].x);
+        const dy = y - countrySeeds[country].y;
+        const distance = dx * dx + dy * dy;
+        if (distance < nearestDistance) {
+          nearestDistance = distance;
+          nearestCountry = country;
+        }
+      }
+      if (nearestCountry < 0) throw new Error(`Coarse geography cell ${coarseX},${coarseY} could not be assigned.`);
+      coarseOwners[coarseY * ownershipWidth + coarseX] = nearestCountry;
+    }
+  }
   for (const index of landIndices) {
     const pinnedOwner = seedOwnerByCell[index];
     if (pinnedOwner !== -1) {
@@ -335,19 +360,13 @@ export function generatePlanetWorld(seed = WORLD_SEED): PlanetWorld {
     }
     const x = index % MAP_WIDTH;
     const y = Math.floor(index / MAP_WIDTH);
-    let nearestCountry = -1;
-    let nearestDistance = Number.POSITIVE_INFINITY;
-    for (let country = 0; country < countrySeeds.length; country++) {
-      const dx = wrapDistanceX(x, countrySeeds[country].x);
-      const dy = y - countrySeeds[country].y;
-      const distance = dx * dx + dy * dy;
-      if (distance < nearestDistance) {
-        nearestDistance = distance;
-        nearestCountry = country;
-      }
+    const coarseX = Math.min(ownershipWidth - 1, Math.floor(x / ownershipScale));
+    const coarseY = Math.min(ownershipHeight - 1, Math.floor(y / ownershipScale));
+    const owner = coarseOwners[coarseY * ownershipWidth + coarseX];
+    if (owner < 0 || owner >= COUNTRY_COUNT) {
+      throw new Error(`Land cell ${index} received invalid coarse owner ${owner}.`);
     }
-    if (nearestCountry < 0) throw new Error(`Land cell ${index} could not be assigned to a country.`);
-    countryOwners[index] = nearestCountry;
+    countryOwners[index] = owner;
   }
   for (let country = 0; country < COUNTRY_COUNT; country++) {
     const seedIndex = countrySeeds[country].y * MAP_WIDTH + countrySeeds[country].x;
