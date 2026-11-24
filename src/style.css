@@ -194,3 +194,22 @@ footer { display: flex; justify-content: space-between; padding: 20px 0 26px; bo
 .location-readout { position:absolute; z-index:3; left:50%; bottom:82px; transform:translateX(-50%); width:min(90%,680px); padding:11px 14px; border:1px solid rgba(165,148,255,.25); border-radius:12px; color:#e8e4ff; background:rgba(8,10,18,.84); box-shadow:0 12px 36px rgba(0,0,0,.28); font:10px/1.7 'DM Mono',monospace; text-align:center; backdrop-filter:blur(14px); pointer-events:none; }
 .location-readout[hidden] { display:none; }
 @media(max-width:700px) { .map-zoom-controls { right:12px; bottom:48px; } .map-zoom-controls button { width:36px; height:36px; } .location-readout { bottom:92px; font-size:8px; } }
+
+
+/* Senpe life-cycle dashboard */
+.senpe-life-panel { max-width:720px; margin:0 auto 20px; padding:20px 22px 16px; border:1px solid rgba(143,218,169,.18); border-radius:16px; background:linear-gradient(135deg,rgba(19,39,38,.72),rgba(13,15,27,.86)); }
+.senpe-life-heading { display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:16px; }
+.senpe-life-heading .eyebrow { margin:0 0 5px; color:#91d9b4; }
+.senpe-life-heading h2 { margin:0; color:#e7f7ee; font-size:21px; letter-spacing:-.04em; }
+.senpe-life-age { padding:7px 9px; border:1px solid rgba(143,218,169,.22); border-radius:20px; color:#a8e6c5; font:8px 'DM Mono',monospace; white-space:nowrap; }
+.senpe-life-grid { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:8px; }
+.senpe-life-grid > div { min-width:0; padding:11px; border:1px solid rgba(174,220,199,.09); border-radius:9px; background:rgba(255,255,255,.025); }
+.senpe-life-grid small { display:block; color:#8d9f9a; font:8px 'DM Mono',monospace; letter-spacing:.05em; }
+.senpe-life-grid strong { display:block; margin-top:7px; color:#d9f5e5; font:600 16px 'DM Mono',monospace; overflow-wrap:anywhere; }
+.senpe-life-note { margin:13px 0 0; color:#84958f; font-size:10px; line-height:1.7; }
+@media(max-width:560px) {
+  .senpe-life-panel { padding:16px 13px 14px; }
+  .senpe-life-heading { align-items:flex-start; flex-direction:column; }
+  .senpe-life-grid { grid-template-columns:repeat(2,minmax(0,1fr)); }
+  .senpe-life-grid strong { font-size:14px; }
+}
