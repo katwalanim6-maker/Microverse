@@ -249,7 +249,7 @@ const earthOrbit = new THREE.Group();
 scene.add(earthOrbit);
 
 // Slightly wider system spacing keeps the Sun clearly separated from Earth.
-const earthOrbitRadius = 10.5;
+const earthOrbitRadius = 40;
 const planetGroup = new THREE.Group();
 planetGroup.position.set(earthOrbitRadius, 0, 0);
 earthOrbit.add(planetGroup);
@@ -287,7 +287,7 @@ function sampleSurface(u: number, v: number): { elevation: number; land: number 
 
 const PLANET_RADIUS = 2.6;
 const ATMOSPHERE_RADIUS = 2.72;
-const planetGeometry = new THREE.SphereGeometry(PLANET_RADIUS, 960, 480);
+const planetGeometry = new THREE.SphereGeometry(PLANET_RADIUS, 1920, 960);
 const positions = planetGeometry.getAttribute('position');
 const uvs = planetGeometry.getAttribute('uv');
 for (let vertex = 0; vertex < positions.count; vertex++) {
@@ -474,8 +474,8 @@ const moon = new THREE.Mesh(
   new THREE.SphereGeometry(0.20, 28, 20),
   new THREE.MeshStandardMaterial({ color: 0xcbd5e8, roughness: 0.9, metalness: 0.02, emissive: 0x202b45 })
 );
-// The Moon follows a wider 43-unit orbit around Earth and is slightly smaller.
-moon.position.set(43, 0, 0);
+// The Moon follows a 13-unit orbit around Earth and is slightly smaller.
+moon.position.set(13, 0, 0);
 moonOrbit.add(moon);
 const moonHalo = new THREE.Mesh(
   new THREE.SphereGeometry(0.30, 18, 14),
