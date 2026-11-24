@@ -11,6 +11,7 @@ const infoPageNode = document.querySelector<HTMLElement>('#info-page');
 const pageButtons = document.querySelectorAll<HTMLButtonElement>('[data-page]');
 const backToWorldButton = document.querySelector<HTMLButtonElement>('#back-to-world');
 const zoomLevelNode = document.querySelector<HTMLElement>('#zoom-level');
+const locationNode = document.querySelector<HTMLElement>('#location-readout');
 const yearNode = document.querySelector<HTMLElement>('#world-year');
 const summaryNode = document.querySelector<HTMLElement>('#world-summary');
 const countryListNode = document.querySelector<HTMLElement>('#country-list');
@@ -98,8 +99,8 @@ const scene = new THREE.Scene();
 scene.background = new THREE.Color('#080a12');
 
 // Wide framing shows the Sun, Earth and Moon together at the starting zoom.
-const camera = new THREE.PerspectiveCamera(72, 1, 0.1, 220);
-camera.position.set(0, 0, 28);
+const camera = new THREE.PerspectiveCamera(58, 1, 0.1, 260);
+camera.position.set(0, 0, 11);
 // The observer camera orbits Earth; dragging never rotates the planet or celestial bodies.
 let cameraAzimuth = 0;
 let cameraPolar = Math.PI / 2;
@@ -137,8 +138,8 @@ function random(seed: number): () => number {
 
 function createPlanetTexture(worldData: PlanetWorld): THREE.CanvasTexture {
   const canvas = document.createElement('canvas');
-  canvas.width = 3072;
-  canvas.height = 1536;
+  canvas.width = 4096;
+  canvas.height = 2048;
   const context = canvas.getContext('2d');
   if (!context) throw new Error('Canvas texture is unavailable.');
 
@@ -206,7 +207,7 @@ function createPlanetTexture(worldData: PlanetWorld): THREE.CanvasTexture {
 
   // Deterministic terrain micro-relief becomes visible as the camera zooms closer.
   const detailRand = random(worldData.seed + 1907);
-  for (let i = 0; i < 32000; i++) {
+  for (let i = 0; i < 120000; i++) {
     const px = detailRand() * canvas.width;
     const py = detailRand() * canvas.height;
     const cellX = Math.min(worldData.width - 1, Math.floor(px / canvas.width * worldData.width));
@@ -225,7 +226,7 @@ function createPlanetTexture(worldData: PlanetWorld): THREE.CanvasTexture {
 
   // Fine atmospheric streaks sit above the authoritative geography layer.
   const rand = random(worldData.seed + 701);
-  for (let i = 0; i < 420; i++) {
+  for (let i = 0; i < 1100; i++) {
     const x = rand() * canvas.width;
     const y = rand() * canvas.height;
     const length = 8 + rand() * 95;
@@ -248,7 +249,7 @@ const earthOrbit = new THREE.Group();
 scene.add(earthOrbit);
 
 // Slightly wider system spacing keeps the Sun clearly separated from Earth.
-const earthOrbitRadius = 8.8;
+const earthOrbitRadius = 10.5;
 const planetGroup = new THREE.Group();
 planetGroup.position.set(earthOrbitRadius, 0, 0);
 earthOrbit.add(planetGroup);
@@ -284,7 +285,9 @@ function sampleSurface(u: number, v: number): { elevation: number; land: number 
   };
 }
 
-const planetGeometry = new THREE.SphereGeometry(1.72, 720, 360);
+const PLANET_RADIUS = 2.6;
+const ATMOSPHERE_RADIUS = 2.72;
+const planetGeometry = new THREE.SphereGeometry(PLANET_RADIUS, 960, 480);
 const positions = planetGeometry.getAttribute('position');
 const uvs = planetGeometry.getAttribute('uv');
 for (let vertex = 0; vertex < positions.count; vertex++) {
@@ -301,7 +304,7 @@ for (let vertex = 0; vertex < positions.count; vertex++) {
   const fineDetail = Math.sin(u * 410 + world.seed * 0.003) * Math.sin(v * 290 + world.seed * 0.004);
   const landHeight = 0.028 + sample.elevation * 0.235 + broadDetail * 0.006 + fineDetail * 0.0018;
   const oceanDepth = -0.018 + sample.elevation * 0.018;
-  const radius = 1.72 + oceanDepth * (1 - sample.land) + landHeight * sample.land;
+  const radius = PLANET_RADIUS + oceanDepth * (1 - sample.land) + landHeight * sample.land;
   positions.setXYZ(vertex, nx / length * radius, ny / length * radius, nz / length * radius);
 }
 planetGeometry.computeVertexNormals();
@@ -358,7 +361,7 @@ function createCountryBorderOverlay(worldData: PlanetWorld): THREE.LineSegments 
     const sample = sampleSurface(u, v);
     const phi = u * Math.PI * 2;
     const theta = (1 - v) * Math.PI;
-    const radius = 1.72 + 0.035 + sample.elevation * 0.235;
+    const radius = PLANET_RADIUS + 0.035 + sample.elevation * 0.235;
     return new THREE.Vector3(
       -Math.cos(phi) * Math.sin(theta) * radius,
       Math.cos(theta) * radius,
@@ -430,7 +433,7 @@ const countryBorders = createCountryBorderOverlay(world);
 planetSpin.add(countryBorders);
 
 const atmosphere = new THREE.Mesh(
-  new THREE.SphereGeometry(1.79, 96, 64),
+  new THREE.SphereGeometry(ATMOSPHERE_RADIUS, 128, 96),
   new THREE.MeshBasicMaterial({ color: 0x688cff, transparent: true, opacity: 0.10, side: THREE.BackSide })
 );
 planetSpin.add(atmosphere);
@@ -484,7 +487,8 @@ const activePointers = new Map<number, { x: number; y: number }>();
 const pointerStarts = new Map<number, { x: number; y: number }>();
 let pinchDistance = 0;
 let clickCandidate = false;
-let cameraDistance = 28;
+let cameraDistance = 11;
+let cameraDistanceTarget = 11;
 
 function distanceBetweenPointers(): number {
   const points = [...activePointers.values()];
@@ -515,10 +519,10 @@ renderer.domElement.addEventListener('pointermove', (event) => {
   if (activePointers.size >= 2) {
     const nextDistance = distanceBetweenPointers();
     if (pinchDistance > 0 && nextDistance > 0) {
-      cameraDistance = THREE.MathUtils.clamp(
-        cameraDistance + (pinchDistance - nextDistance) * 0.010,
-        2.05,
-        90
+      cameraDistanceTarget = THREE.MathUtils.clamp(
+        cameraDistanceTarget + (pinchDistance - nextDistance) * 0.010,
+        3.15,
+        120
       );
     }
     pinchDistance = nextDistance;
@@ -556,20 +560,22 @@ function selectCountryAtPointer(clientX: number, clientY: number): void {
   if (!uv) return;
   const x = Math.min(world.width - 1, Math.max(0, Math.floor(uv.x * world.width)));
   const y = Math.min(world.height - 1, Math.max(0, Math.floor((1 - uv.y) * world.height)));
-  let cell = world.cells[y * world.width + x];
-  if (!cell || cell.countryIndex < 0) {
-    for (let radius = 1; radius <= 3 && (!cell || cell.countryIndex < 0); radius++) {
-      for (let dy = -radius; dy <= radius && (!cell || cell.countryIndex < 0); dy++) {
-        for (let dx = -radius; dx <= radius && (!cell || cell.countryIndex < 0); dx++) {
-          const candidateX = (x + dx + world.width) % world.width;
-          const candidateY = Math.min(world.height - 1, Math.max(0, y + dy));
-          const candidate = world.cells[candidateY * world.width + candidateX];
-          if (candidate.countryIndex >= 0) cell = candidate;
-        }
-      }
-    }
+  const cell = world.cells[y * world.width + x];
+  if (!cell) return;
+  const latitude = uv.y * 180 - 90;
+  const longitude = uv.x * 360 - 180;
+  const country = cell.countryIndex >= 0 ? world.countries[cell.countryIndex] : null;
+  const terrainName = cell.terrain === 'coast' ? 'Coastal land' : cell.terrain[0].toUpperCase() + cell.terrain.slice(1);
+  const locationText = [
+    `${latitude.toFixed(3)}° ${latitude >= 0 ? 'N' : 'S'} · ${Math.abs(longitude).toFixed(3)}° ${longitude >= 0 ? 'E' : 'W'}`,
+    country ? country.name : 'Open ocean',
+    `${terrainName} · Elevation ${Math.round(cell.elevation * 8848).toLocaleString('en-US')} m`,
+    `Biome: ${cell.biome}${cell.river ? ' · River' : ''}${cell.volcanic ? ' · Volcanic region' : ''}`
+  ].join('  |  ');
+  if (locationNode) {
+    locationNode.textContent = locationText;
+    locationNode.hidden = false;
   }
-  if (cell && cell.countryIndex >= 0) showCountry(world.countries[cell.countryIndex]);
 }
 
 function finishPointer(event: PointerEvent): void {
@@ -597,9 +603,16 @@ function finishPointer(event: PointerEvent): void {
 }
 renderer.domElement.addEventListener('pointerup', finishPointer);
 renderer.domElement.addEventListener('pointercancel', finishPointer);
+document.querySelector<HTMLButtonElement>('#zoom-in')?.addEventListener('click', () => {
+  cameraDistanceTarget = Math.max(3.15, cameraDistanceTarget * 0.78);
+});
+document.querySelector<HTMLButtonElement>('#zoom-out')?.addEventListener('click', () => {
+  cameraDistanceTarget = Math.min(120, cameraDistanceTarget / 0.78);
+});
+
 renderer.domElement.addEventListener('wheel', (event) => {
   event.preventDefault();
-  cameraDistance = THREE.MathUtils.clamp(cameraDistance + event.deltaY * 0.0025, 2.05, 90);
+  cameraDistanceTarget = THREE.MathUtils.clamp(cameraDistanceTarget + event.deltaY * 0.0025, 3.15, 120);
 }, { passive: false });
 
 function resize(): void {
@@ -689,8 +702,9 @@ function animate(now: number): void {
   const elapsedSeconds = Math.max(0, (Date.now() - lastWallClockMs) / 1000);
   lastWallClockMs = Date.now();
   simulationMinutes += elapsedSeconds * SIMULATION_MINUTES_PER_REAL_SECOND;
+  cameraDistance += (cameraDistanceTarget - cameraDistance) * Math.min(1, elapsedSeconds * 9);
   renderClock();
-  const zoomLabel = cameraDistance < 2.45 ? 'CLOSE VIEW · ELEVATION & RIVERS' : cameraDistance < 3.4 ? 'LOCAL VIEW · TERRAIN & BIOMES' : cameraDistance < 4.8 ? 'REGIONAL VIEW · COUNTRY GEOGRAPHY' : cameraDistance < 6.5 ? 'CONTINENT VIEW · NATIONAL BORDERS' : cameraDistance > 24 ? 'SYSTEM VIEW · SUN & MOON' : 'PLANET VIEW · GLOBAL DETAIL';
+  const zoomLabel = cameraDistance < 4.4 ? 'CITY SCALE · LOCAL TERRAIN' : cameraDistance < 6.5 ? 'REGIONAL VIEW · TERRAIN & RIVERS' : cameraDistance < 9.5 ? 'COUNTRY VIEW · NATIONAL GEOGRAPHY' : cameraDistance < 15 ? 'CONTINENT VIEW · NATIONAL BORDERS' : cameraDistance > 40 ? 'SYSTEM VIEW · SUN & MOON' : 'PLANET VIEW · GLOBAL DETAIL';
   if (zoomLevelNode && zoomLevelNode.textContent !== zoomLabel) zoomLevelNode.textContent = zoomLabel;
   // Orbital periods follow the world's calendar:
   // At the current speed, one real second advances 30 simulated minutes.
