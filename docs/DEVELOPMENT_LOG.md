@@ -24,3 +24,23 @@
 - Validate 100 country records and exactly 1,000,000 initial population per country.
 - Add deterministic population-ledger tests for births, deaths, illness/recovery and migration.
 - Inspect the deployed globe on a phone.
+
+
+## 2026-11-24 — World Expansion 2.0 foundation
+
+- Created the isolated `world-expansion-v2` branch so expansion work does not overwrite the known-good main branch.
+- Changed the application clock to 30 simulation minutes per real second.
+- Introduced clock storage version 3 while retaining reads from the previous v2 and v1 keys, preserving saved simulation time during the speed change.
+- Updated the README and technical architecture to the new clock rate.
+- Added the World Expansion 2.0 design contract and roadmap for staged high-resolution geography, open-ended professions, political/history evolution and eventual space expansion.
+- Audited the source and found the actual geography generator currently uses 540 × 270 (145,800 cells), not the 1620 × 810 stated in older architecture notes. Resolution upgrades are therefore gated behind benchmarks rather than an unsafe direct jump.
+- Confirmed the Railway project currently has only the web service; there is no persistent simulation worker, database or volume yet.
+
+### Verification still required
+
+- Run the TypeScript/Vite production build on the branch.
+- Benchmark 1080 × 540 and 1620 × 810 generation before changing the active grid.
+- Test the new clock against save/reload and phone background/foreground behavior.
+- Do not provision a worker or database until the architecture and recurring cost are reviewed.
+
+- Added a GitHub Actions workflow to run the TypeScript/Vite production build on pushes to the expansion branch and pull requests targeting main.

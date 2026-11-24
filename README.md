@@ -12,7 +12,7 @@ The current application establishes:
 - A target of 73% land and 27% ocean, measured with latitude-based spherical cell weights at the current map resolution.
 - Exactly 1,000,000 starting inhabitants per country: 100,000,000 globally.
 - Camera rotation and zoom.
-- A simulation clock: **1 real second = 1 simulation minute**.
+- A simulation clock: **1 real second = 30 simulation minutes**.
 - Pause/resume controls and a responsive observer interface.
 - A first population lifecycle foundation for individual records and explicit demographic events.
 
@@ -59,6 +59,7 @@ npm run start
 - [Technical architecture](docs/TECHNICAL_ARCHITECTURE.md)
 - [Development roadmap](docs/DEVELOPMENT_ROADMAP.md)
 - [Development log](docs/DEVELOPMENT_LOG.md)
+- [World Expansion 2.0 design](docs/WORLD_EXPANSION_V2.md)
 
 ## Development principles
 

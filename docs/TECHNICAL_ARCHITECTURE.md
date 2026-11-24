@@ -59,10 +59,10 @@ The next rendering stage should introduce regional tile/mesh LOD and streamed hi
 
 ## 5. Simulation time
 
-The constitutional rate is one simulation minute per real second. The clock should be a separate service with:
+The current constitutional rate is 30 simulation minutes per real second. This is a configurable simulation-time multiplier, independent of rendering frame rate. The clock should be a separate service with:
 - Accumulated simulation time.
 - Pause/resume.
-- Controlled speed multiplier.
+- Controlled speed multiplier (default: 30 simulation minutes per real second).
 - A monotonic elapsed-time source while the app is active.
 - Persisted timestamp/checkpoint for recovery.
 - Deterministic tick/event ordering where practical.
