@@ -1,6 +1,6 @@
 export const SENPE_MATURITY_AGE = 6;
 export const SENPE_LIFESPAN_YEARS = 35;
-export const SENPE_BIRTHS_PER_ADULT_YEAR = 1 / 29;
+export const SENPE_BIRTHS_PER_ADULT_YEAR = 1 / 28;
 export const SENPE_POPULATION_STORAGE_KEY = 'microverse-senpe-population-v1';
 
 export interface SenpePopulationState {
